@@ -1,0 +1,1969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>THE QUBIT</title>
+<style>
+  :root {
+    --green: #00ff41;
+    --dim-green: #008f17;
+    --dark-green: #003b08;
+    --cyan: #22d3ee;
+    --bg: #000000;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+  #game { display: block; width: 100vw; height: 100vh; background: #000; cursor: crosshair; }
+  .overlay {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(0,40,8,0.6) 0%, rgba(0,0,0,0.95) 70%);
+    text-align: center; padding: 20px; z-index: 10; overflow-y: auto;
+  }
+  .hidden { display: none !important; }
+  h1.title {
+    font-size: clamp(34px, 8vw, 86px);
+    letter-spacing: 0.15em;
+    color: var(--green);
+    text-shadow: 0 0 10px var(--green), 0 0 20px var(--green), 0 0 40px var(--dim-green);
+    margin-bottom: 10px;
+    animation: flicker 3s infinite;
+  }
+  @keyframes flicker {
+    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+    20%, 24%, 55% { opacity: 0.6; }
+  }
+  .subtitle {
+    color: var(--dim-green);
+    letter-spacing: 0.3em;
+    font-size: clamp(10px, 1.5vw, 14px);
+    margin-bottom: 24px;
+  }
+  .modes { display: flex; flex-direction: column; gap: 12px; width: min(420px, 92vw); }
+  button.retro {
+    background: transparent; color: var(--green);
+    border: 2px solid var(--green); padding: 12px 16px;
+    font-family: inherit; font-size: clamp(13px, 1.8vw, 17px);
+    letter-spacing: 0.2em; cursor: pointer; transition: all 0.15s ease; text-transform: uppercase;
+  }
+  button.retro:hover, button.retro:focus {
+    background: var(--green); color: #000;
+    box-shadow: 0 0 20px var(--green), inset 0 0 20px rgba(0,0,0,0.3);
+    outline: none;
+  }
+  button.retro.small { padding: 8px 12px; font-size: 12px; }
+  button.retro.dim { border-color: var(--dim-green); color: var(--dim-green); }
+  button.retro.dim:hover { background: var(--dim-green); color: #000; }
+  button.retro.cyan { border-color: var(--cyan); color: var(--cyan); }
+  button.retro.cyan:hover { background: var(--cyan); color: #000; box-shadow: 0 0 20px var(--cyan); }
+  button.retro small { display: block; font-size: 10px; color: var(--dim-green); margin-top: 4px; letter-spacing: 0.15em; }
+  button.retro:hover small { color: #002b00; }
+  input.retro {
+    background: #000; color: var(--green); border: 2px solid var(--green);
+    font-family: inherit; font-size: 18px; padding: 10px 14px;
+    width: 100%; text-align: center; letter-spacing: 0.2em; outline: none;
+  }
+  input.retro::placeholder { color: var(--dark-green); }
+  input.retro:focus { box-shadow: 0 0 14px var(--green); }
+  .legend {
+    margin-top: 20px; color: var(--dim-green);
+    font-size: 11px; line-height: 1.6; letter-spacing: 0.1em; max-width: 460px;
+  }
+  .legend .row { display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+  #hud {
+    position: fixed; top: 12px; left: 12px; right: 12px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    pointer-events: none; z-index: 5;
+    font-size: clamp(11px, 1.4vw, 14px); letter-spacing: 0.15em;
+    text-shadow: 0 0 8px var(--green);
+  }
+  #hud .left, #hud .right, #hud .center {
+    background: rgba(0,0,0,0.55); border: 1px solid var(--dark-green); padding: 8px 12px;
+  }
+  #hud .right { text-align: right; }
+  #hud .center { text-align: center; }
+  .powerups {
+    position: fixed; bottom: 10px; left: 50%;
+    transform: translateX(-50%); display: flex; gap: 6px; z-index: 5;
+    pointer-events: auto; flex-wrap: wrap; justify-content: center; max-width: 96vw;
+  }
+  .pu {
+    border: 1px solid var(--green); background: rgba(0,0,0,0.7);
+    padding: 5px 8px; text-align: center; min-width: 88px;
+    font-size: 10px; letter-spacing: 0.08em; color: var(--green);
+    cursor: pointer; transition: all 0.15s ease;
+  }
+  .pu .key { font-size: 13px; font-weight: bold; }
+  .pu .name { margin-top: 1px; font-size: 9px; }
+  .pu .meta { color: var(--dim-green); margin-top: 2px; font-size: 9px; }
+  .pu.locked { color: var(--dim-green); border-color: var(--dark-green); cursor: default; }
+  .pu.active { background: rgba(0,255,65,0.18); box-shadow: 0 0 16px var(--green); }
+  .pu.ready { box-shadow: 0 0 8px var(--green); }
+  .pu:hover:not(.locked):not(.active) { background: rgba(0,255,65,0.12); }
+  /* Matter shooter UI */
+  .matter-bar {
+    position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; z-index: 5; pointer-events: auto;
+  }
+  .mb {
+    width: 88px; padding: 8px; text-align: center;
+    border: 2px solid; background: rgba(0,0,0,0.7);
+    cursor: pointer; font-size: 11px; letter-spacing: 0.1em;
+  }
+  .mb .cd { display: block; font-size: 9px; margin-top: 2px; opacity: 0.7; }
+  .mb.selected { box-shadow: 0 0 16px currentColor; }
+  .mb.cooling { opacity: 0.45; cursor: default; }
+  #endTitle {
+    font-size: clamp(36px, 8vw, 80px); color: var(--green);
+    text-shadow: 0 0 16px var(--green), 0 0 32px var(--dim-green); margin-bottom: 8px;
+  }
+  #endStats {
+    color: var(--dim-green); font-size: 14px;
+    letter-spacing: 0.2em; margin-bottom: 24px; white-space: pre-line;
+  }
+  .panel {
+    width: min(560px, 95vw); border: 1px solid var(--green);
+    padding: 18px; background: rgba(0,12,3,0.7); text-align: left;
+  }
+  .panel h2 { font-size: 18px; letter-spacing: 0.25em; margin-bottom: 8px; color: var(--green); text-shadow: 0 0 6px var(--green); }
+  .panel p { font-size: 11px; color: var(--dim-green); letter-spacing: 0.1em; margin: 6px 0 10px; line-height: 1.6; }
+  .panel label { display: block; font-size: 11px; color: var(--green); margin: 12px 0 4px; letter-spacing: 0.15em; }
+  .panel .row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .panel .row > * { flex: 1; min-width: 120px; }
+  .status-line {
+    margin-top: 10px; padding: 8px;
+    border: 1px dashed var(--dim-green); font-size: 11px;
+    color: var(--green); min-height: 26px;
+  }
+  .player-list {
+    max-height: 240px; overflow-y: auto; border: 1px solid var(--dark-green);
+    background: #000; padding: 4px;
+  }
+  .player-list .empty { padding: 18px; text-align: center; color: var(--dim-green); font-size: 12px; }
+  .player-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 10px; border-bottom: 1px solid var(--dark-green); cursor: pointer;
+    transition: all 0.1s; font-size: 12px; letter-spacing: 0.1em;
+  }
+  .player-row:hover { background: rgba(0,255,65,0.1); }
+  .player-row .pcode { color: var(--dim-green); font-size: 10px; }
+  .me-info {
+    border: 1px solid var(--green); padding: 10px;
+    background: #000; font-size: 12px; letter-spacing: 0.15em;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .me-info .code-box {
+    color: #fff; font-size: 18px; letter-spacing: 0.25em;
+    text-shadow: 0 0 8px var(--green); padding: 4px 8px;
+    border: 1px solid var(--green); background: rgba(0,255,65,0.1);
+  }
+  .invite-card {
+    border: 2px solid var(--cyan); background: rgba(0,30,40,0.9);
+    padding: 16px; box-shadow: 0 0 24px var(--cyan);
+    width: min(420px, 92vw); text-align: center;
+  }
+  .invite-card h3 { color: var(--cyan); font-size: 20px; letter-spacing: 0.2em; margin-bottom: 8px; }
+  .invite-card .from { font-size: 14px; color: var(--green); margin-bottom: 4px; }
+  .invite-card .mode { font-size: 12px; color: var(--dim-green); margin-bottom: 14px; letter-spacing: 0.15em; }
+  .scanlines::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(to bottom,
+      rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
+      rgba(0,40,8,0.18) 3px, rgba(0,40,8,0.18) 3px);
+    z-index: 100; mix-blend-mode: multiply;
+  }
+  .vignette::after {
+    content: ''; position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.85) 100%);
+    z-index: 99;
+  }
+  .badge { display: inline-block; border: 1px solid var(--green); padding: 2px 6px; font-size: 10px; margin-left: 6px; letter-spacing: 0.1em; }
+  .conn-indicator {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; letter-spacing: 0.2em; padding: 4px 10px;
+    border: 1px solid var(--dim-green); background: rgba(0,0,0,0.6);
+    z-index: 50;
+  }
+  .conn-indicator.ok { color: var(--green); border-color: var(--green); }
+  .conn-indicator.bad { color: #ff3860; border-color: #ff3860; }
+  .toast {
+    position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.85); border: 1px solid var(--green);
+    padding: 8px 16px; font-size: 12px; letter-spacing: 0.15em;
+    z-index: 60; box-shadow: 0 0 16px var(--green);
+    pointer-events: none; opacity: 0; transition: opacity 0.2s;
+  }
+  .toast.show { opacity: 1; }
+  .lb-row {
+    display: grid; grid-template-columns: 40px 1fr auto;
+    align-items: center; gap: 10px;
+    padding: 8px 10px; border-bottom: 1px solid var(--dark-green);
+    font-size: 13px; letter-spacing: 0.1em;
+  }
+  .lb-row.me { background: rgba(0,255,65,0.12); box-shadow: inset 0 0 12px rgba(0,255,65,0.2); }
+  .lb-rank { color: var(--dim-green); font-weight: bold; }
+  .lb-rank.gold { color: #facc15; text-shadow: 0 0 8px #facc15; }
+  .lb-rank.silver { color: #d1d5db; text-shadow: 0 0 6px #d1d5db; }
+  .lb-rank.bronze { color: #d97706; text-shadow: 0 0 6px #d97706; }
+  .lb-time { color: var(--green); font-weight: bold; }
+  .lb-tab.selected { background: var(--green); color: #000; }
+</style>
+</head>
+<body class="scanlines vignette">
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div class="left">
+      <div>TIME <span id="hudTime">0.0</span>s</div>
+      <div>MODE <span id="hudMode">--</span></div>
+    </div>
+    <div class="center" id="hudCenter" style="display:none">
+      <div id="hudCenterTitle">OPPONENT</div>
+      <div id="hudOppTime">0.0s</div>
+    </div>
+    <div class="right">
+      <div>STATE: <span id="hudState">|q&gt;</span></div>
+      <div id="hudExtra">NEAR MISSES <span id="hudMiss">0</span></div>
+    </div>
+  </div>
+
+  <div id="powerups" class="powerups hidden"></div>
+  <div id="matterBar" class="matter-bar hidden"></div>
+
+  <div id="connBadge" class="conn-indicator hidden">OFFLINE</div>
+  <div id="toast" class="toast"></div>
+
+  <!-- MAIN MENU -->
+  <div id="menu" class="overlay">
+    <h1 class="title">THE QUBIT</h1>
+    <div class="subtitle">A QUANTUM SURVIVAL GAME</div>
+    <div class="modes">
+      <button class="retro" data-mode="easy">EASY<small>FEW PARTICLES // LEARN THE FIELD</small></button>
+      <button class="retro" data-mode="normal">NORMAL<small>STANDARD CHAOS // RECOMMENDED</small></button>
+      <button class="retro" data-mode="hard">HARD<small>QUANTUM STORM // VERY CHALLENGING</small></button>
+      <button class="retro cyan" id="btnMP">MULTIPLAYER<small>LIVE LOBBY // INVITE BY CODE</small></button>
+      <button class="retro dim" id="btnLB">LEADERBOARD<small>TOP OPERATORS PER MODE</small></button>
+    </div>
+    <div class="legend">
+      <div class="row"><span class="dot" style="background:#00ff41"></span>NORMAL MATTER</div>
+      <div class="row"><span class="dot" style="background:#ffffff"></span>LIGHT (FAST)</div>
+      <div class="row"><span class="dot" style="background:#a855f7"></span>DARK MATTER (TRACKS YOU)</div>
+      <div class="row"><span class="dot" style="background:#ff3860"></span>ANTIMATTER (FASTER)</div>
+      <div style="margin-top:12px">MOUSE OR FINGER &middot; KEYS 1-7 ACTIVATE POWERUPS</div>
+    </div>
+  </div>
+
+  <!-- NICKNAME SCREEN -->
+  <div id="nickScreen" class="overlay hidden">
+    <h1 class="title" style="font-size:clamp(30px,6vw,64px)">QUANTUM ID</h1>
+    <div class="subtitle">CHOOSE YOUR NICKNAME</div>
+    <div class="panel">
+      <p>Your nickname is how other quantum operators see you in the lobby. Keep it short (max 18 characters).</p>
+      <input id="nickInput" class="retro" maxlength="18" placeholder="ENTER NICKNAME" autocomplete="off" />
+      <div class="row">
+        <button class="retro" id="btnNickGo">ENTER LOBBY</button>
+        <button class="retro dim small" id="btnNickBack">BACK</button>
+      </div>
+      <div class="status-line" id="nickStatus">Tip: enter saves your nickname locally for next time.</div>
+    </div>
+  </div>
+
+  <!-- LOBBY -->
+  <div id="lobby" class="overlay hidden">
+    <h1 class="title" style="font-size:clamp(28px,5vw,52px)">QUANTUM LOBBY</h1>
+    <div class="subtitle" id="lobbySub">CONNECTING...</div>
+
+    <div class="panel">
+      <div class="me-info">
+        <div>YOU: <span id="meNick" style="color:#fff">--</span></div>
+        <div>CODE: <span class="code-box" id="meCode">-----</span></div>
+      </div>
+
+      <label>JOIN BY CODE</label>
+      <div class="row">
+        <input id="codeInput" class="retro" maxlength="5" placeholder="abcde" style="text-transform:lowercase" />
+        <button class="retro small" id="btnInviteByCode">INVITE</button>
+      </div>
+
+      <label>SELECT MODE BEFORE INVITING</label>
+      <div class="row">
+        <button class="retro small mode-pick selected" data-pick="competition">COMPETITION</button>
+        <button class="retro small mode-pick" data-pick="qvm">QUBIT vs MATTER</button>
+      </div>
+      <div class="row" id="compRow">
+        <button class="retro small diff-pick selected" data-diff="easy">EASY</button>
+        <button class="retro small diff-pick" data-diff="normal">NORMAL</button>
+        <button class="retro small diff-pick" data-diff="hard">HARD</button>
+      </div>
+      <div class="row hidden" id="roleRow">
+        <button class="retro small role-pick selected" data-role="qubit">I AM QUBIT</button>
+        <button class="retro small role-pick" data-role="matter">I AM MATTER</button>
+      </div>
+
+      <label>ONLINE PLAYERS <span id="onlineCount" style="color:var(--dim-green)">(0)</span></label>
+      <div class="player-list" id="playerList">
+        <div class="empty">No other operators in the field...</div>
+      </div>
+
+      <div class="row">
+        <button class="retro small" id="btnRename">RENAME</button>
+        <button class="retro dim small" id="btnLobbyLeave">LEAVE LOBBY</button>
+      </div>
+      <div class="status-line" id="lobbyStatus">Welcome to the field.</div>
+    </div>
+  </div>
+
+  <!-- INVITE INCOMING -->
+  <div id="inviteScreen" class="overlay hidden">
+    <div class="invite-card">
+      <h3>INVITE INCOMING</h3>
+      <div class="from" id="inviteFromNick">--</div>
+      <div class="mode" id="inviteMode">--</div>
+      <div class="row">
+        <button class="retro cyan" id="btnAccept">ACCEPT</button>
+        <button class="retro dim" id="btnDecline">DECLINE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- END SCREEN -->
+  <div id="endScreen" class="overlay hidden">
+    <div id="endTitle">DECAYED</div>
+    <div id="endStats">SURVIVED 0.0s // MODE --</div>
+    <div id="endRank" class="hidden" style="font-size:14px;color:var(--green);letter-spacing:0.2em;margin-bottom:18px;text-shadow:0 0 8px var(--green)"></div>
+    <div class="modes">
+      <button class="retro" id="btnRetry">RETRY</button>
+      <button class="retro" id="btnViewLB">VIEW LEADERBOARD</button>
+      <button class="retro" id="btnMenu">MAIN MENU</button>
+    </div>
+  </div>
+
+  <!-- SUBMIT SCORE PROMPT -->
+  <div id="submitScreen" class="overlay hidden">
+    <h1 class="title" style="font-size:clamp(28px,5vw,52px)">RUN COMPLETE</h1>
+    <div class="subtitle" id="submitSub">SUBMIT TO LEADERBOARD?</div>
+    <div class="panel">
+      <p>You survived <span id="submitTime" style="color:var(--green)">--</span> on <span id="submitMode" style="color:var(--green)">--</span>. Enter a nickname to claim your place in the field.</p>
+      <input id="submitNick" class="retro" maxlength="18" placeholder="ENTER NICKNAME" autocomplete="off" />
+      <div class="row">
+        <button class="retro" id="btnSubmitScore">SUBMIT</button>
+        <button class="retro dim" id="btnSkipScore">SKIP</button>
+      </div>
+      <div class="status-line" id="submitStatus">Empty nickname will skip. Saved for next run.</div>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div id="lbScreen" class="overlay hidden">
+    <h1 class="title" style="font-size:clamp(28px,5vw,52px)">LEADERBOARD</h1>
+    <div class="subtitle">TOP QUANTUM OPERATORS</div>
+    <div class="panel">
+      <div class="row">
+        <button class="retro small lb-tab selected" data-tab="easy">EASY</button>
+        <button class="retro small lb-tab" data-tab="normal">NORMAL</button>
+        <button class="retro small lb-tab" data-tab="hard">HARD</button>
+      </div>
+      <div class="player-list" id="lbList" style="max-height:340px;margin-top:12px">
+        <div class="empty">LOADING...</div>
+      </div>
+      <div class="row">
+        <button class="retro small" id="btnLBRefresh">REFRESH</button>
+        <button class="retro dim small" id="btnLBBack">BACK</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ============================================================
+  // GLOBALS
+  // ============================================================
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const menu = document.getElementById('menu');
+  const endScreen = document.getElementById('endScreen');
+  const nickScreen = document.getElementById('nickScreen');
+  const lobbyScreen = document.getElementById('lobby');
+  const inviteScreen = document.getElementById('inviteScreen');
+  const hud = document.getElementById('hud');
+  const powerupsEl = document.getElementById('powerups');
+  const matterBar = document.getElementById('matterBar');
+  const hudTime = document.getElementById('hudTime');
+  const hudMode = document.getElementById('hudMode');
+  const hudState = document.getElementById('hudState');
+  const hudMiss = document.getElementById('hudMiss');
+  const hudCenter = document.getElementById('hudCenter');
+  const hudCenterTitle = document.getElementById('hudCenterTitle');
+  const hudOppTime = document.getElementById('hudOppTime');
+  const hudExtra = document.getElementById('hudExtra');
+  const endTitle = document.getElementById('endTitle');
+  const endStats = document.getElementById('endStats');
+  const connBadge = document.getElementById('connBadge');
+  const toastEl = document.getElementById('toast');
+
+  let DPR = Math.min(window.devicePixelRatio || 1, 2);
+  let W = 0, H = 0;
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.floor(W * DPR); canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+
+  // ============================================================
+  // INPUT
+  // ============================================================
+  const input = { x: W / 2, y: H / 2, active: false, tapAt: null };
+  function setPointer(e) {
+    const t = e.touches ? e.touches[0] : e;
+    if (!t) return;
+    input.x = t.clientX; input.y = t.clientY; input.active = true;
+  }
+  window.addEventListener('mousemove', setPointer);
+  window.addEventListener('touchmove', e => { setPointer(e); e.preventDefault(); }, { passive: false });
+  window.addEventListener('touchstart', e => { setPointer(e); }, { passive: true });
+  // Tap-to-shoot for matter player
+  canvas.addEventListener('mousedown', e => {
+    if (state && state.role === 'matter') tryShoot(e.clientX, e.clientY);
+  });
+  canvas.addEventListener('touchstart', e => {
+    if (state && state.role === 'matter' && e.touches[0]) {
+      tryShoot(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  }, { passive: true });
+
+  // ============================================================
+  // GAME DATA
+  // ============================================================
+  const MODES = {
+    easy:   { name: 'EASY',   spawn: 1.10, speedMul: 0.85, antimatterChance: 0.10, lightChance: 0.18, darkChance: 0.10 },
+    normal: { name: 'NORMAL', spawn: 0.60, speedMul: 1.00, antimatterChance: 0.18, lightChance: 0.25, darkChance: 0.14 },
+    hard:   { name: 'HARD',   spawn: 0.32, speedMul: 1.20, antimatterChance: 0.26, lightChance: 0.30, darkChance: 0.20 }
+  };
+  const COLORS = { normal: '#00ff41', light: '#ffffff', dark: '#a855f7', anti: '#ff3860' };
+  const POWERS = [
+    { id: 'super', key: '1', name: 'SUPERPOSITION', sym: 'Ψ', unlock: 30, charges: 2, duration: 20 },
+    { id: 'schro', key: '2', name: "SCHRÖDINGER",   sym: 'S', unlock: 60, charges: 1, duration: 20 },
+    { id: 'decoh', key: '3', name: 'DECOHERENCE',   sym: 'Δ', unlock: 90, charges: 1, duration: 15 }
+  ];
+  const MATTER_TYPES = [
+    { id: 'normal', key: '1', name: 'NORMAL', cd: 0.40, color: COLORS.normal },
+    { id: 'light',  key: '2', name: 'LIGHT',  cd: 0.85, color: COLORS.light  },
+    { id: 'dark',   key: '3', name: 'DARK',   cd: 2.20, color: COLORS.dark   },
+    { id: 'anti',   key: '4', name: 'ANTI',   cd: 1.30, color: COLORS.anti   }
+  ];
+
+  const puEls = {};
+  function buildPowerUI() {
+    powerupsEl.innerHTML = '';
+    POWERS.forEach(p => {
+      const div = document.createElement('div');
+      div.className = 'pu locked';
+      div.dataset.id = p.id;
+      div.innerHTML = `<div class="key">[${p.key}] ${p.sym}</div><div class="name">${p.name}</div><div class="meta">LOCKED</div>`;
+      div.addEventListener('click', () => activatePower(p.id));
+      div.addEventListener('touchstart', e => { e.preventDefault(); activatePower(p.id); }, { passive: false });
+      powerupsEl.appendChild(div);
+      puEls[p.id] = div;
+    });
+  }
+  buildPowerUI();
+
+  const mbEls = {};
+  function buildMatterBar() {
+    matterBar.innerHTML = '';
+    MATTER_TYPES.forEach((m, i) => {
+      const div = document.createElement('div');
+      div.className = 'mb' + (i === 0 ? ' selected' : '');
+      div.style.color = m.color;
+      div.style.borderColor = m.color;
+      div.dataset.id = m.id;
+      div.innerHTML = `<div>[${m.key}] ${m.name}</div><div class="cd" data-cd>READY</div>`;
+      div.addEventListener('click', () => selectMatter(m.id));
+      div.addEventListener('touchstart', e => { e.preventDefault(); selectMatter(m.id); }, { passive: false });
+      matterBar.appendChild(div);
+      mbEls[m.id] = div;
+    });
+  }
+  buildMatterBar();
+
+  // ============================================================
+  // STATE
+  // ============================================================
+  let state = null;
+  let nextPid = 1;
+
+  function newState(modeKey, mpCtx) {
+    const powers = {};
+    POWERS.forEach(p => { powers[p.id] = { charges: 0, unlocked: false, activeUntil: 0 }; });
+    const matterCd = {};
+    MATTER_TYPES.forEach(m => { matterCd[m.id] = 0; });
+    return {
+      mode: modeKey,
+      cfg: MODES[modeKey] || MODES.normal,
+      t: 0,
+      spawnT: 0,
+      qubit: { x: W / 2, y: H / 2, r: 9 },
+      particles: [],
+      effects: [],
+      stars: makeStars(80),
+      running: true,
+      missCount: 0,
+      powers,
+      shake: 0,
+      cause: '',
+      // multiplayer context
+      mp: mpCtx || null,          // { peerNick, peerId, isHost }
+      role: mpCtx ? mpCtx.role : null,  // 'qubit' | 'matter' | 'p1' | 'p2' | null
+      gameMode: mpCtx ? mpCtx.gameMode : 'solo', // solo | competition | qvm
+      // matter-shooter state
+      matterCd, selectedMatter: 'normal',
+      // peer view
+      peerState: { x: W/2, y: H/2, lastUpdate: 0 },
+      peerDead: false, peerSurvived: 0, peerState_local: null,
+      // network throttles
+      lastPosSent: 0, lastSnapshotSent: 0, lastTimeSent: 0,
+      iAmDead: false, deadAt: 0
+    };
+  }
+  function makeStars(n) {
+    const arr = [];
+    for (let i = 0; i < n; i++) {
+      arr.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 1.2 + 0.2, a: Math.random() * 0.4 + 0.1, tw: Math.random() * Math.PI * 2 });
+    }
+    return arr;
+  }
+
+  // ============================================================
+  // PARTICLES
+  // ============================================================
+  function spawnParticle() {
+    const cfg = state.cfg;
+    const roll = Math.random();
+    let type;
+    if (roll < cfg.antimatterChance) type = 'anti';
+    else if (roll < cfg.antimatterChance + cfg.lightChance) type = 'light';
+    else if (roll < cfg.antimatterChance + cfg.lightChance + cfg.darkChance) type = 'dark';
+    else type = 'normal';
+    const side = Math.floor(Math.random() * 4);
+    const margin = 30;
+    let x, y, ang;
+    if (side === 0)      { x = -margin;    y = Math.random() * H;  ang = (Math.random() - 0.5) * 0.9; }
+    else if (side === 1) { x = W + margin; y = Math.random() * H;  ang = Math.PI + (Math.random() - 0.5) * 0.9; }
+    else if (side === 2) { x = Math.random()*W; y = -margin;       ang = Math.PI / 2 + (Math.random() - 0.5) * 0.9; }
+    else                 { x = Math.random()*W; y = H + margin;    ang = -Math.PI / 2 + (Math.random() - 0.5) * 0.9; }
+    pushParticle(type, x, y, ang, cfg.speedMul);
+  }
+  function pushParticle(type, x, y, ang, speedMul) {
+    let speed;
+    if (type === 'normal') speed = 220;
+    else if (type === 'light') speed = 460;
+    else if (type === 'dark')  speed = 130;
+    else                       speed = 340;
+    speed *= (speedMul || 1);
+    const radius = type === 'light' ? 3 : (type === 'dark' ? 7 : 5);
+    state.particles.push({
+      id: nextPid++, type, x, y,
+      vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
+      r: radius, color: COLORS[type],
+      life: 0, maxLife: 14, trail: [],
+      trackUntil: type === 'dark' ? 5 : 0, baseSpeed: speed
+    });
+  }
+  // For matter shooter — aim from edge nearest tap toward tap point, then continue toward qubit
+  function pushAimedParticle(type, targetX, targetY, qubitPos) {
+    // spawn from nearest edge toward target
+    const sides = [
+      { x: -30, y: targetY },
+      { x: W + 30, y: targetY },
+      { x: targetX, y: -30 },
+      { x: targetX, y: H + 30 }
+    ];
+    let best = sides[0], bestD = 1e9;
+    for (const s of sides) {
+      const d = Math.hypot(s.x - targetX, s.y - targetY);
+      if (d < bestD) { bestD = d; best = s; }
+    }
+    // aim toward qubit's current position (with small inaccuracy)
+    const tx = qubitPos.x + (Math.random() - 0.5) * 40;
+    const ty = qubitPos.y + (Math.random() - 0.5) * 40;
+    const ang = Math.atan2(ty - best.y, tx - best.x);
+    pushParticle(type, best.x, best.y, ang, 1.0);
+  }
+
+  // ============================================================
+  // POWER-UPS
+  // ============================================================
+  function activatePower(id) {
+    if (!state || !state.running) return;
+    if (state.role === 'matter') return; // matter player has no powers
+    if (state.iAmDead) return;
+    const ps = state.powers[id]; if (!ps) return;
+    const def = POWERS.find(p => p.id === id);
+    if (!ps.unlocked || ps.charges <= 0) return;
+    if (def.duration > 0 && state.t < ps.activeUntil) return;
+    ps.charges -= 1;
+    ps.activeUntil = def.duration > 0 ? state.t + def.duration : state.t;
+    applyPowerEffect(id);
+    if (state.mp) mpSend({ t: 'pow', id, x: state.qubit.x, y: state.qubit.y });
+  }
+  function applyPowerEffect(id) {
+    const q = state.qubit;
+    if (id === 'super')    { spawnRing(q.x, q.y, 8, 120, 0.5, '#00ff41'); spawnSparks(q.x, q.y, 24, 220, 0.6, '#00ff41'); }
+    else if (id === 'schro') { spawnRing(q.x, q.y, 6, 200, 0.9, '#7CFFB2'); spawnSparks(q.x, q.y, 36, 140, 0.8, '#7CFFB2'); }
+    else if (id === 'tunnel') {
+      const dx = input.x - q.x, dy = input.y - q.y;
+      const d = Math.hypot(dx, dy) || 1; const dashDist = 220;
+      for (let i = 0; i < 8; i++) {
+        const t2 = i / 8;
+        state.effects.push({ kind: 'afterimage', x: q.x + (dx/d) * dashDist * t2, y: q.y + (dy/d) * dashDist * t2, life: 0, maxLife: 0.45, color: '#22d3ee' });
+      }
+      q.x = Math.max(10, Math.min(W - 10, q.x + (dx/d) * dashDist));
+      q.y = Math.max(10, Math.min(H - 10, q.y + (dy/d) * dashDist));
+      spawnRing(q.x, q.y, 5, 80, 0.5, '#22d3ee');
+    } else if (id === 'collapse') {
+      const R = 200; let killed = 0;
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        if (Math.hypot(p.x - q.x, p.y - q.y) < R) {
+          spawnSparks(p.x, p.y, 6, 120, 0.4, p.color);
+          state.particles.splice(i, 1); killed++;
+        }
+      }
+      spawnRing(q.x, q.y, 10, R, 0.5, '#facc15');
+      state.shake = Math.min(14, killed * 1.2 + 4);
+    } else if (id === 'decoh') spawnRing(q.x, q.y, 12, 260, 0.8, '#60a5fa');
+    else if (id === 'pauli') spawnRing(q.x, q.y, 8, 180, 0.7, '#f472b6');
+    else if (id === 'heis')  spawnRing(q.x, q.y, 6, 140, 0.6, '#fb923c');
+  }
+  function spawnSparks(x, y, count, speed, life, color) {
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + Math.random() * 0.2;
+      state.effects.push({ kind: 'spark', x, y, vx: Math.cos(a) * speed * (0.6 + Math.random()*0.6), vy: Math.sin(a) * speed * (0.6 + Math.random()*0.6), life: 0, maxLife: life, color });
+    }
+  }
+  function spawnRing(x, y, r, maxR, life, color) {
+    state.effects.push({ kind: 'ring', x, y, r, maxR, life: 0, maxLife: life, color });
+  }
+
+  // ============================================================
+  // MATTER SHOOTER
+  // ============================================================
+  function selectMatter(id) {
+    state.selectedMatter = id;
+    for (const k in mbEls) mbEls[k].classList.toggle('selected', k === id);
+  }
+  function tryShoot(x, y) {
+    if (!state || !state.running || state.role !== 'matter') return;
+    const m = MATTER_TYPES.find(mt => mt.id === state.selectedMatter);
+    if (!m) return;
+    if (state.t < state.matterCd[m.id]) return;
+    state.matterCd[m.id] = state.t + m.cd;
+    // matter shooter requests qubit player to spawn matter via relay
+    mpSend({ t: 'shoot', mt: m.id, x, y });
+    // local visual feedback
+    spawnRing(x, y, 6, 30, 0.3, m.color);
+  }
+  function updateMatterBar() {
+    for (const m of MATTER_TYPES) {
+      const el = mbEls[m.id];
+      const remain = state.matterCd[m.id] - state.t;
+      const cdEl = el.querySelector('[data-cd]');
+      if (remain > 0) {
+        el.classList.add('cooling');
+        cdEl.textContent = remain.toFixed(1) + 's';
+      } else {
+        el.classList.remove('cooling');
+        cdEl.textContent = 'READY';
+      }
+    }
+  }
+
+  // ============================================================
+  // UPDATE
+  // ============================================================
+  function update(dt) {
+    state.t += dt;
+    for (const s of state.stars) s.tw += dt * 2;
+
+    // === Decay animation phase ===
+    if (state.dying) {
+      tickDeath(dt);
+    }
+
+    // Update unlocks (qubit role only)
+    if (state.role !== 'matter' && !state.dying) {
+      for (const p of POWERS) {
+        const ps = state.powers[p.id];
+        if (!ps.unlocked && state.t >= p.unlock) {
+          ps.unlocked = true; ps.charges = p.charges;
+        }
+      }
+      updatePowerUI();
+    }
+
+    const isActive = id => state.t < ((state.powers[id] && state.powers[id].activeUntil) || 0);
+    const superActive = isActive('super');
+    const schroActive = isActive('schro');
+    const decohActive = isActive('decoh');
+
+    // Move qubit (only if I am the qubit AND alive)
+    if (state.role !== 'matter' && !state.dying) {
+      const followLerp = superActive ? 0.42 : 0.22;
+      state.qubit.x += (input.x - state.qubit.x) * followLerp;
+      state.qubit.y += (input.y - state.qubit.y) * followLerp;
+      state.qubit.x = Math.max(10, Math.min(W - 10, state.qubit.x));
+      state.qubit.y = Math.max(10, Math.min(H - 10, state.qubit.y));
+    }
+
+    // Spawning
+    // Solo: spawn locally
+    // Competition: host spawns
+    // QvM: nobody auto-spawns; only matter player triggers via tryShoot
+    const isHostSpawner = state.gameMode === 'solo' || (state.gameMode === 'competition' && state.mp && state.mp.isHost);
+    if (isHostSpawner) {
+      state.spawnT -= dt;
+      // Very gradual difficulty ramp — spawns get faster the longer you survive.
+      // 0.0015/sec linear, capped so it can't go below 0.2× the base interval.
+      const ramp = Math.max(0.2, 1 - state.t * 0.0015);
+      if (state.spawnT <= 0) {
+        spawnParticle();
+        state.spawnT = state.cfg.spawn * ramp * (0.6 + Math.random() * 0.8);
+      }
+    }
+
+    // Authoritative side runs full physics; non-auth side just dead-reckons from snapshot velocities.
+    // Non-auth side must NOT cull by screen bounds (it could have a smaller window than the host's).
+    const isAuth = !state.mp ||
+      (state.gameMode === 'competition' && state.mp.isHost) ||
+      (state.gameMode === 'qvm' && state.role === 'qubit');
+
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const p = state.particles[i];
+      p.life += dt;
+      const speedMul = (isAuth && decohActive && state.role !== 'matter') ? 0.35 : 1.0;
+      if (isAuth && p.type === 'dark' && p.life < p.trackUntil && state.role !== 'matter') {
+        const dx = state.qubit.x - p.x, dy = state.qubit.y - p.y;
+        const d = Math.hypot(dx, dy) || 1;
+        p.vx += (dx/d) * 180 * dt; p.vy += (dy/d) * 180 * dt;
+        const sp = Math.hypot(p.vx, p.vy);
+        const maxSp = p.baseSpeed * 1.6;
+        if (sp > maxSp) { p.vx = (p.vx/sp) * maxSp; p.vy = (p.vy/sp) * maxSp; }
+      }
+      if (isAuth) {
+        p.x += p.vx * dt * speedMul;
+        p.y += p.vy * dt * speedMul;
+      } else {
+        // Non-auth: render position smoothly chases a target that dead-reckons with
+        // the latest snapshot velocity. This kills the snap/dead-reckon rubber-banding.
+        if (p.tx === undefined) { p.tx = p.x; p.ty = p.y; }
+        p.tx += p.vx * dt;
+        p.ty += p.vy * dt;
+        const k = 1 - Math.exp(-14 * dt);
+        p.x += (p.tx - p.x) * k;
+        p.y += (p.ty - p.y) * k;
+      }
+      p.trail.push({ x: p.x, y: p.y });
+      const maxTrail = p.type === 'light' ? 14 : (p.type === 'anti' ? 10 : 8);
+      if (p.trail.length > maxTrail) p.trail.shift();
+
+      // Collision only for qubit role
+      if (state.role !== 'matter' && !state.iAmDead) {
+        const dx2 = p.x - state.qubit.x, dy2 = p.y - state.qubit.y;
+        const dist = Math.hypot(dx2, dy2);
+        const hitR = p.r + state.qubit.r;
+        if (dist < hitR) {
+          // Schrödinger phases through everything EXCEPT dark matter — dark matter still kills.
+          if (!schroActive || p.type === 'dark') { gameOver('hit by ' + p.type + ' matter'); return; }
+        } else if (dist < hitR + 18) {
+          if (!p.nearLogged) { p.nearLogged = true; state.missCount++; }
+        }
+      }
+      // Auth side culls by screen + life. Non-auth side trusts snapshots to remove particles
+      // (the "not seen" delete in handlePeerMessage), and only culls absurdly stale ones.
+      if (isAuth) {
+        if (p.x < -60 || p.x > W + 60 || p.y < -60 || p.y > H + 60 || p.life > p.maxLife) {
+          state.particles.splice(i, 1);
+        }
+      } else if (p.life > p.maxLife + 5) {
+        state.particles.splice(i, 1);
+      }
+    }
+
+    // Effects
+    for (let i = state.effects.length - 1; i >= 0; i--) {
+      const e = state.effects[i];
+      e.life += dt;
+      if (e.kind === 'spark') { e.x += e.vx * dt; e.y += e.vy * dt; e.vx *= 0.96; e.vy *= 0.96; }
+      else if (e.kind === 'fragment') {
+        e.x += e.vx * dt; e.y += e.vy * dt;
+        e.vx *= 0.94; e.vy *= 0.94;
+        e.rot = (e.rot || 0) + (e.rotSpeed || 0) * dt;
+      } else if (e.kind === 'bit') {
+        e.vy += 380 * dt; // gravity
+        e.x += e.vx * dt; e.y += e.vy * dt;
+        e.vx *= 0.985;
+        e.rot = (e.rot || 0) + (e.rotSpeed || 0) * dt;
+      }
+      if (e.life >= e.maxLife) state.effects.splice(i, 1);
+    }
+    state.shake *= 0.9;
+
+    // HUD
+    hudTime.textContent = (state.iAmDead ? state.deadAt : state.t).toFixed(1);
+    hudMiss.textContent = state.missCount;
+    hudState.textContent = stateLabel();
+    if (state.role === 'matter') updateMatterBar();
+
+    // Network
+    if (state.mp) {
+      // Smoothly chase the latest reported opponent position.
+      if (state.peerState.tx !== undefined) {
+        const k = 1 - Math.exp(-18 * dt);
+        state.peerState.x += (state.peerState.tx - state.peerState.x) * k;
+        state.peerState.y += (state.peerState.ty - state.peerState.y) * k;
+      }
+      mpTick(dt);
+    }
+  }
+  function stateLabel() {
+    if (state.role === 'matter') return 'MATTER SHOOTER';
+    if (state.iAmDead) return 'SPECTATING';
+    if (state.t < state.powers.schro.activeUntil) return '|0> + |1> GHOST';
+    if (state.t < state.powers.super.activeUntil) return '|+> SUPERPOSED';
+    if (state.t < state.powers.decoh.activeUntil) return 'DECOHERENCE';
+    return '|q>';
+  }
+  function updatePowerUI() {
+    for (const p of POWERS) {
+      const ps = state.powers[p.id];
+      const el = puEls[p.id]; const metaEl = el.querySelector('.meta');
+      el.classList.remove('locked', 'ready', 'active');
+      if (!ps.unlocked) {
+        el.classList.add('locked');
+        metaEl.textContent = `LOCK ${Math.max(0, p.unlock - state.t).toFixed(0)}s`;
+      } else if (p.duration > 0 && state.t < ps.activeUntil) {
+        el.classList.add('active');
+        metaEl.textContent = `ACTIVE ${Math.max(0, ps.activeUntil - state.t).toFixed(1)}s`;
+      } else if (ps.charges > 0) {
+        el.classList.add('ready');
+        metaEl.textContent = `READY x${ps.charges}`;
+      } else { el.classList.add('locked'); metaEl.textContent = 'SPENT'; }
+    }
+  }
+
+  // ============================================================
+  // RENDER
+  // ============================================================
+  function draw() {
+    const sx = (Math.random() - 0.5) * state.shake;
+    const sy = (Math.random() - 0.5) * state.shake;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.translate(sx, sy);
+    drawGrid();
+    for (const s of state.stars) {
+      const a = s.a + Math.sin(s.tw) * 0.15;
+      ctx.fillStyle = `rgba(0,255,65,${a.toFixed(3)})`;
+      ctx.fillRect(s.x, s.y, s.s, s.s);
+    }
+    if (state.role !== 'matter' && state.t < state.powers.decoh.activeUntil) drawDecoherenceField();
+    for (const p of state.particles) drawParticle(p);
+    for (const e of state.effects) drawEffect(e);
+
+    if (state.role === 'matter') {
+      // Show qubit using peerState (the opposing qubit player)
+      drawQubitCore(state.peerState.x, state.peerState.y, 9, 0.95, '#00ff41');
+      // crosshair for matter shooter
+      drawCrosshair(input.x, input.y);
+    } else {
+      // I am the qubit — only draw the live core if I haven't started decaying.
+      if (!state.dying) drawQubit();
+      // Show opponent qubit (Competition) as cyan
+      if (state.gameMode === 'competition' && state.mp && !state.peerDead) {
+        drawOpponent(state.peerState);
+      }
+    }
+
+    ctx.restore();
+  }
+  function drawGrid() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,255,65,0.06)'; ctx.lineWidth = 1;
+    const step = 40;
+    ctx.beginPath();
+    for (let x = 0; x < W; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+    for (let y = 0; y < H; y += step) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+    ctx.stroke(); ctx.restore();
+  }
+  function drawDecoherenceField() {
+    ctx.save(); ctx.globalAlpha = 0.15;
+    for (let i = 0; i < 6; i++) {
+      const phase = state.t * 0.6 + i * 0.7;
+      ctx.fillStyle = `rgba(96,165,250,${0.08 + Math.sin(phase) * 0.04})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(96,165,250,0.18)';
+    for (let i = 0; i < 14; i++) {
+      const yy = (i / 14) * H + Math.sin(state.t * 1.4 + i) * 4;
+      ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawPauliBarrier() {
+    const q = state.qubit;
+    ctx.save();
+    ctx.strokeStyle = `rgba(244,114,182,${0.35 + Math.sin(state.t * 8) * 0.15})`;
+    ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
+    ctx.beginPath(); ctx.arc(q.x, q.y, 160, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
+  }
+  function drawParticle(p) {
+    if (p.trail.length > 1) {
+      ctx.save(); ctx.lineCap = 'round';
+      for (let i = 1; i < p.trail.length; i++) {
+        const a = i / p.trail.length;
+        ctx.strokeStyle = hexA(p.color, 0.05 + a * 0.45);
+        ctx.lineWidth = p.r * a * 1.4;
+        ctx.beginPath();
+        ctx.moveTo(p.trail[i - 1].x, p.trail[i - 1].y);
+        ctx.lineTo(p.trail[i].x, p.trail[i].y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.shadowColor = p.color; ctx.shadowBlur = 18;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    if (p.type === 'anti') {
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(p.x - p.r * 0.7, p.y); ctx.lineTo(p.x + p.r * 0.7, p.y);
+      ctx.moveTo(p.x, p.y - p.r * 0.7); ctx.lineTo(p.x, p.y + p.r * 0.7);
+      ctx.stroke();
+    }
+    if (p.type === 'dark' && p.life < p.trackUntil) {
+      ctx.strokeStyle = hexA(p.color, 0.35); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 5 + Math.sin(p.life * 8) * 2, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawEffect(e) {
+    const a = 1 - e.life / e.maxLife;
+    if (e.kind === 'spark') {
+      ctx.save(); ctx.shadowColor = e.color; ctx.shadowBlur = 12;
+      ctx.fillStyle = hexA(e.color, a);
+      ctx.fillRect(e.x - 1.5, e.y - 1.5, 3, 3); ctx.restore();
+    } else if (e.kind === 'ring') {
+      const r = e.r + (e.maxR - e.r) * (e.life / e.maxLife);
+      ctx.save();
+      ctx.strokeStyle = hexA(e.color, a); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    } else if (e.kind === 'afterimage') {
+      ctx.save(); ctx.shadowColor = e.color; ctx.shadowBlur = 14;
+      ctx.fillStyle = hexA(e.color, a * 0.6);
+      ctx.beginPath(); ctx.arc(e.x, e.y, 8 * a, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } else if (e.kind === 'fragment') {
+      // Mini-qubit piece with chromatic split — physics in update loop.
+      ctx.save();
+      ctx.shadowColor = e.color; ctx.shadowBlur = 14;
+      const off = 2.5 * a;
+      ctx.fillStyle = hexA('#ff3860', a * 0.6);
+      ctx.beginPath(); ctx.arc(e.x + off, e.y, e.r * a, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = hexA('#22d3ee', a * 0.6);
+      ctx.beginPath(); ctx.arc(e.x - off, e.y, e.r * a, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = hexA(e.color, a);
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.r * a, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } else if (e.kind === 'bit') {
+      // Falling "0"/"1" character — physics in update loop.
+      ctx.save();
+      ctx.translate(e.x, e.y); ctx.rotate(e.rot || 0);
+      ctx.shadowColor = e.color; ctx.shadowBlur = 10;
+      ctx.fillStyle = hexA(e.color, a);
+      ctx.font = `bold ${e.size}px "Courier New"`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(e.ch, 0, 0);
+      ctx.restore();
+    } else if (e.kind === 'flash') {
+      ctx.save();
+      ctx.fillStyle = hexA(e.color, (e.alpha || 1) * a);
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+  }
+  function drawQubit() {
+    const q = state.qubit;
+    const superActive = state.t < state.powers.super.activeUntil;
+    const schroActive = state.t < state.powers.schro.activeUntil;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,255,65,0.25)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(q.x, q.y, q.r + 6 + Math.sin(state.t * 6) * 1.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    if (schroActive) {
+      for (let i = 0; i < 4; i++) {
+        const ang = state.t * 3 + i * (Math.PI / 2);
+        drawQubitCore(q.x + Math.cos(ang)*6, q.y + Math.sin(ang)*6, q.r, 0.35, '#7CFFB2');
+      }
+      drawQubitCore(q.x, q.y, q.r, 0.6, '#00ff41'); return;
+    }
+    if (superActive) {
+      const sep = 16 + Math.sin(state.t * 4) * 4; const ang = state.t * 5;
+      const ax = q.x + Math.cos(ang) * sep, ay = q.y + Math.sin(ang) * sep;
+      const bx = q.x - Math.cos(ang) * sep, by = q.y - Math.sin(ang) * sep;
+      ctx.save();
+      const grad = ctx.createLinearGradient(ax, ay, bx, by);
+      grad.addColorStop(0, 'rgba(0,255,65,0.8)');
+      grad.addColorStop(0.5, 'rgba(255,255,255,0.7)');
+      grad.addColorStop(1, 'rgba(0,255,65,0.8)');
+      ctx.strokeStyle = grad; ctx.lineWidth = 2;
+      ctx.shadowColor = '#00ff41'; ctx.shadowBlur = 12;
+      ctx.beginPath();
+      const steps = 16;
+      for (let i = 0; i <= steps; i++) {
+        const tt = i / steps;
+        const lx = ax + (bx - ax) * tt, ly = ay + (by - ay) * tt;
+        const nx = -(by - ay), ny = (bx - ax);
+        const nm = Math.hypot(nx, ny) || 1;
+        const wob = Math.sin(tt * Math.PI * 4 + state.t * 12) * 3;
+        if (i === 0) ctx.moveTo(lx + (nx/nm) * wob, ly + (ny/nm) * wob);
+        else ctx.lineTo(lx + (nx/nm) * wob, ly + (ny/nm) * wob);
+      }
+      ctx.stroke(); ctx.restore();
+      drawQubitCore(ax, ay, q.r, 0.9, '#00ff41');
+      drawQubitCore(bx, by, q.r, 0.9, '#00ff41');
+      return;
+    }
+    drawQubitCore(q.x, q.y, q.r, 1, '#00ff41');
+  }
+  function drawQubitCore(x, y, r, alpha, color) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = color; ctx.shadowBlur = 22;
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0; ctx.fillStyle = '#dfffe7';
+    ctx.beginPath(); ctx.arc(x, y, r * 0.45, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  function drawOpponent(ps) {
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.shadowColor = '#22d3ee'; ctx.shadowBlur = 16;
+    ctx.fillStyle = '#22d3ee';
+    ctx.beginPath(); ctx.arc(ps.x, ps.y, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0; ctx.fillStyle = '#e0fbfc';
+    ctx.beginPath(); ctx.arc(ps.x, ps.y, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.font = '10px "Courier New"'; ctx.fillStyle = 'rgba(34,211,238,0.9)';
+    ctx.textAlign = 'center'; ctx.fillText('OPPONENT', ps.x, ps.y - 14);
+    ctx.restore();
+  }
+  function drawCrosshair(x, y) {
+    const m = MATTER_TYPES.find(mt => mt.id === state.selectedMatter);
+    const color = m ? m.color : '#fff';
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - 18, y); ctx.lineTo(x - 8, y);
+    ctx.moveTo(x + 8, y); ctx.lineTo(x + 18, y);
+    ctx.moveTo(x, y - 18); ctx.lineTo(x, y - 8);
+    ctx.moveTo(x, y + 8); ctx.lineTo(x, y + 18);
+    ctx.stroke();
+    ctx.restore();
+  }
+  function hexA(hex, a) {
+    if (hex === '#ffffff') return `rgba(255,255,255,${a})`;
+    if (hex.startsWith('#')) {
+      const h = hex.slice(1);
+      const r = parseInt(h.substring(0, 2), 16);
+      const g = parseInt(h.substring(2, 4), 16);
+      const b = parseInt(h.substring(4, 6), 16);
+      return `rgba(${r},${g},${b},${a})`;
+    }
+    return hex;
+  }
+
+  // ============================================================
+  // LOOP
+  // ============================================================
+  let last = 0;
+  function loop(ts) {
+    if (!last) last = ts;
+    let dt = Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (state && state.running) {
+      // Time dilation during the decay animation — eases from 0.25× back to 1×.
+      if (state.dying) {
+        const elapsed = state.t - state.dyingStart;
+        const slow = elapsed < 0.4 ? 0.25 : (elapsed < 1.2 ? 0.45 : 0.85);
+        dt *= slow;
+      }
+      update(dt);
+      draw();
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // ============================================================
+  // LIFECYCLE
+  // ============================================================
+  function startSoloGame(modeKey) {
+    state = newState(modeKey, null);
+    hideAllOverlays();
+    hudMode.textContent = MODES[modeKey].name;
+    hudCenter.style.display = 'none';
+    hudExtra.style.display = '';
+    hud.classList.remove('hidden');
+    powerupsEl.classList.remove('hidden');
+    matterBar.classList.add('hidden');
+  }
+  function startMpGame(matchInfo) {
+    const isCompetition = matchInfo.mode === 'competition';
+    const role = matchInfo.role; // 'qubit'/'matter' for qvm, 'p1'/'p2' for competition
+    const modeKey = isCompetition ? (matchInfo.difficulty || 'normal') : 'normal';
+    state = newState(modeKey, {
+      peerNick: matchInfo.peerNick, peerId: matchInfo.peerId,
+      isHost: matchInfo.isHost, gameMode: matchInfo.mode, role
+    });
+    hideAllOverlays();
+    hudMode.textContent = isCompetition ? ('COMPETE // ' + MODES[modeKey].name) : 'QUBIT vs MATTER';
+    hudCenter.style.display = 'block';
+    hudCenterTitle.textContent = 'vs ' + matchInfo.peerNick;
+    hud.classList.remove('hidden');
+    if (role === 'matter') {
+      powerupsEl.classList.add('hidden');
+      matterBar.classList.remove('hidden');
+      hudExtra.style.display = 'none';
+    } else {
+      powerupsEl.classList.remove('hidden');
+      matterBar.classList.add('hidden');
+      hudExtra.style.display = '';
+    }
+  }
+  function hideAllOverlays() {
+    menu.classList.add('hidden'); endScreen.classList.add('hidden');
+    nickScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
+    inviteScreen.classList.add('hidden');
+    const sub = document.getElementById('submitScreen');
+    const lb = document.getElementById('lbScreen');
+    if (sub) sub.classList.add('hidden');
+    if (lb) lb.classList.add('hidden');
+  }
+
+  function gameOver(reason) {
+    if (!state.running || state.dying) return;
+    state.iAmDead = true;
+    state.deadAt = state.t;
+    state.cause = reason || 'decohered';
+    // Matter shooter has no qubit to decay — just close out.
+    if (state.role === 'matter') {
+      state.running = false;
+      setTimeout(showEndScreen, 300);
+      return;
+    }
+    state.dying = true;
+    state.dyingStart = state.t;
+    state.dyingRealStart = performance.now();
+    state.deathX = state.qubit.x;
+    state.deathY = state.qubit.y;
+    state.shake = 26;
+    startDeathAnimation();
+    if (state.mp) {
+      mpSend({ t: 'dead', survived: state.t, near: state.missCount });
+      if (state.gameMode === 'competition') {
+        if (state.peerDead) scheduleEnd();
+        else showToast('YOU DECOHERED — SPECTATING ' + state.mp.peerNick);
+      } else if (state.gameMode === 'qvm') {
+        scheduleEnd();
+      }
+    } else {
+      scheduleEnd();
+    }
+  }
+
+  // Solo + qvm + competition-after-peer-dead: end after the decay animation completes.
+  // Competition spectator case is handled separately (peer dies → finishMpMatch).
+  function scheduleEnd() {
+    state.endQueued = true;
+  }
+
+  // Build the initial death burst. Continuous additions happen in update() while dying.
+  function startDeathAnimation() {
+    const cx = state.deathX, cy = state.deathY;
+    // Big shockwave rings — concentric, color-banded
+    spawnRing(cx, cy, 6, 260, 0.55, '#ffffff');
+    spawnRing(cx, cy, 6, 380, 0.85, '#00ff41');
+    spawnRing(cx, cy, 6, 520, 1.20, '#ff3860');
+    spawnRing(cx, cy, 6, 700, 1.80, '#7CFFB2');
+    // Sparks — denser than before
+    for (let i = 0; i < 80; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 80 + Math.random() * 380;
+      state.effects.push({
+        kind: 'spark', x: cx, y: cy,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 0, maxLife: 0.9 + Math.random() * 0.8,
+        color: pickDecayColor()
+      });
+    }
+    // Qubit fragments — mini-qubits that drift outward and fade
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.random() * 0.3;
+      const sp = 90 + Math.random() * 120;
+      state.effects.push({
+        kind: 'fragment', x: cx, y: cy,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 0, maxLife: 1.4 + Math.random() * 0.6,
+        r: 5 + Math.random() * 3,
+        color: Math.random() < 0.7 ? '#00ff41' : '#7CFFB2',
+        rot: 0, rotSpeed: (Math.random() - 0.5) * 8
+      });
+    }
+    // "0" and "1" bits — falling/scattering text — the qubit literally decays back to bits
+    for (let i = 0; i < 26; i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI; // upward fan
+      const sp = 120 + Math.random() * 220;
+      state.effects.push({
+        kind: 'bit', x: cx, y: cy,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 0, maxLife: 1.6 + Math.random() * 0.5,
+        ch: Math.random() < 0.5 ? '0' : '1',
+        size: 12 + Math.random() * 14,
+        color: Math.random() < 0.3 ? '#ff3860' : '#00ff41',
+        rot: 0, rotSpeed: (Math.random() - 0.5) * 4
+      });
+    }
+    // Initial bright flash overlay
+    state.effects.push({ kind: 'flash', life: 0, maxLife: 0.25, color: '#ffffff', alpha: 0.7 });
+  }
+
+  function pickDecayColor() {
+    const r = Math.random();
+    if (r < 0.55) return '#00ff41';
+    if (r < 0.80) return '#ffffff';
+    if (r < 0.95) return '#ff3860';
+    return '#7CFFB2';
+  }
+
+  // Called every frame while state.dying. Drives continuous decay effects and
+  // hands off to showEndScreen once the animation is done.
+  function tickDeath(dt) {
+    const cx = state.deathX, cy = state.deathY;
+    const real = (performance.now() - state.dyingRealStart) / 1000;
+    // residual shake during the first ~0.6s
+    if (real < 0.6) state.shake = Math.max(state.shake, 18 * (1 - real / 0.6));
+
+    if (real < 0.8 && Math.random() < 0.7) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 40 + Math.random() * 180;
+      state.effects.push({
+        kind: 'spark',
+        x: cx + (Math.random() - 0.5) * 30,
+        y: cy + (Math.random() - 0.5) * 30,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 0, maxLife: 0.5 + Math.random() * 0.5,
+        color: pickDecayColor()
+      });
+    }
+    if (real < 1.0 && Math.random() < 0.35) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI;
+      const sp = 60 + Math.random() * 160;
+      state.effects.push({
+        kind: 'bit',
+        x: cx + (Math.random() - 0.5) * 20,
+        y: cy + (Math.random() - 0.5) * 20,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 0, maxLife: 1.2 + Math.random() * 0.5,
+        ch: Math.random() < 0.5 ? '0' : '1',
+        size: 10 + Math.random() * 12,
+        color: pickDecayColor(),
+        rot: 0, rotSpeed: (Math.random() - 0.5) * 4
+      });
+    }
+    if (!state.wave2 && real > 0.35) { state.wave2 = true; spawnRing(cx, cy, 6, 360, 0.9, '#ffffff'); }
+    if (!state.wave3 && real > 0.7)  { state.wave3 = true; spawnRing(cx, cy, 6, 520, 1.1, '#ff3860'); }
+    if (!state.finalFlashShown && real > 1.4) {
+      state.finalFlashShown = true;
+      state.effects.push({ kind: 'flash', life: 0, maxLife: 0.5, color: '#00ff41', alpha: 0.9 });
+    }
+    if (real > 1.9 && state.endQueued && !state.endShown) {
+      state.endShown = true;
+      state.running = false;
+      showEndScreen();
+    }
+  }
+
+  function finishMpMatch() {
+    // Peer died too while we were spectating — kick off the decay if we haven't already.
+    if (!state.dying) {
+      gameOver('match resolved');
+    } else {
+      scheduleEnd();
+    }
+  }
+
+  function showEndScreen() {
+    let title, stats;
+    if (state.mp) {
+      const me = state.deadAt || state.t;
+      const opp = state.peerSurvived;
+      const peerNick = state.mp.peerNick;
+      if (state.gameMode === 'qvm') {
+        if (state.role === 'qubit') {
+          title = 'QUBIT DECOHERED';
+          stats = `YOU SURVIVED ${me.toFixed(2)}s\nKILLED BY ${peerNick}\n${state.cause.toUpperCase()}`;
+        } else {
+          title = 'TARGET DECOHERED';
+          stats = `${peerNick} SURVIVED ${(state.peerSurvived || me).toFixed(2)}s\nYOU SHOT THEM DOWN`;
+        }
+      } else {
+        // competition
+        const mySurv = me;
+        const oppSurv = opp;
+        let verdict;
+        if (mySurv > oppSurv) verdict = 'YOU WIN';
+        else if (mySurv < oppSurv) verdict = peerNick.toUpperCase() + ' WINS';
+        else verdict = 'QUANTUM TIE';
+        title = verdict;
+        stats = `YOU ${mySurv.toFixed(2)}s\n${peerNick.toUpperCase()} ${oppSurv ? oppSurv.toFixed(2)+'s' : 'STILL ALIVE'}\nMODE ${state.cfg.name} // MISSES ${state.missCount}`;
+      }
+    } else {
+      title = 'DECAYED → |BIT>';
+      stats = `SURVIVED ${state.t.toFixed(2)}s\nMODE ${state.cfg.name} // NEAR MISSES ${state.missCount}\n${state.cause.toUpperCase()}`;
+    }
+    endTitle.textContent = title;
+    endStats.textContent = stats;
+    document.getElementById('endRank').classList.add('hidden');
+    hud.classList.add('hidden');
+    powerupsEl.classList.add('hidden');
+    matterBar.classList.add('hidden');
+
+    // Determine leaderboard eligibility:
+    //  - Solo: every run qualifies
+    //  - Competition: only if I outsurvived peer (or peer disconnected and I'm still standing)
+    //  - QvM: never
+    let lbMode = null, lbTime = 0, lbNear = state.missCount;
+    if (!state.mp) {
+      lbMode = state.mode;
+      lbTime = state.t;
+    } else if (state.gameMode === 'competition') {
+      const mySurv = state.deadAt || state.t;
+      if (mySurv > (state.peerSurvived || 0)) { lbMode = state.mode; lbTime = mySurv; }
+    }
+
+    if (lbMode && lbTime > 0 && lbTime <= 3600) {
+      showSubmitPrompt(lbMode, lbTime, lbNear);
+    } else {
+      endScreen.classList.remove('hidden');
+    }
+    if (state.mp) {
+      try { ws && ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ t: 'leave-match' })); } catch {}
+    }
+  }
+
+  // ============================================================
+  // LEADERBOARD
+  // ============================================================
+  const submitScreen = document.getElementById('submitScreen');
+  const lbScreen = document.getElementById('lbScreen');
+  const lbList = document.getElementById('lbList');
+  let lbCurrentTab = 'easy';
+  let lbCache = null;
+  let lbLastSubmitted = null; // { mode, nick, time }
+
+  function apiBase() {
+    if (location.protocol === 'file:') return 'http://localhost:8080';
+    return '';
+  }
+
+  function showSubmitPrompt(mode, time, near) {
+    document.getElementById('submitTime').textContent = time.toFixed(2) + 's';
+    document.getElementById('submitMode').textContent = mode.toUpperCase();
+    const inp = document.getElementById('submitNick');
+    try { inp.value = myNick || localStorage.getItem('qubit_nick') || ''; } catch {}
+    document.getElementById('submitStatus').textContent = 'Empty nickname will skip.';
+    submitScreen.classList.remove('hidden');
+    setTimeout(() => inp.focus(), 100);
+
+    const finish = (submitted) => {
+      submitScreen.classList.add('hidden');
+      endScreen.classList.remove('hidden');
+    };
+
+    const onSubmit = async () => {
+      const nick = inp.value.trim();
+      if (!nick) { finish(false); return; }
+      try { localStorage.setItem('qubit_nick', nick); } catch {}
+      document.getElementById('submitStatus').textContent = 'TRANSMITTING...';
+      try {
+        const r = await fetch(apiBase() + '/api/score', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode, nick, time, near })
+        });
+        const j = await r.json();
+        if (j.ok) {
+          lbLastSubmitted = { mode, nick, time };
+          lbCache = null; // bust cache
+          const rankEl = document.getElementById('endRank');
+          rankEl.classList.remove('hidden');
+          rankEl.textContent = j.inTop ? `★ RANK #${j.rank} ON ${mode.toUpperCase()} ★` : `LOGGED — NOT IN TOP ${j.top.length}`;
+          finish(true);
+        } else {
+          document.getElementById('submitStatus').textContent = 'FAILED: ' + (j.reason || 'unknown');
+        }
+      } catch (e) {
+        document.getElementById('submitStatus').textContent = 'NO SERVER — START server.js TO RECORD SCORES';
+        // Allow skip after error
+      }
+    };
+
+    document.getElementById('btnSubmitScore').onclick = onSubmit;
+    document.getElementById('btnSkipScore').onclick = () => finish(false);
+  }
+
+  async function loadLeaderboard(force) {
+    if (lbCache && !force) return lbCache;
+    try {
+      const r = await fetch(apiBase() + '/api/leaderboard', { cache: 'no-cache' });
+      lbCache = await r.json();
+      return lbCache;
+    } catch {
+      return null;
+    }
+  }
+
+  async function renderLeaderboardTab() {
+    lbList.innerHTML = '<div class="empty">LOADING...</div>';
+    const data = await loadLeaderboard();
+    if (!data) {
+      lbList.innerHTML = '<div class="empty">SERVER UNREACHABLE — start server.js then refresh</div>';
+      return;
+    }
+    const rows = data[lbCurrentTab] || [];
+    if (!rows.length) {
+      lbList.innerHTML = '<div class="empty">No entries yet — be the first.</div>';
+      return;
+    }
+    lbList.innerHTML = '';
+    rows.forEach((e, i) => {
+      const rank = i + 1;
+      const isMe = lbLastSubmitted && lbLastSubmitted.mode === lbCurrentTab &&
+                   lbLastSubmitted.nick === e.nick && Math.abs(lbLastSubmitted.time - e.time) < 0.01;
+      const rankCls = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+      const row = document.createElement('div');
+      row.className = 'lb-row' + (isMe ? ' me' : '');
+      row.innerHTML = `
+        <div class="lb-rank ${rankCls}">#${rank}</div>
+        <div>${escapeHtml(e.nick)}</div>
+        <div class="lb-time">${e.time.toFixed(2)}s</div>`;
+      lbList.appendChild(row);
+    });
+  }
+
+  function openLeaderboard() {
+    hideAllOverlays();
+    lbScreen.classList.remove('hidden');
+    renderLeaderboardTab();
+  }
+
+  document.getElementById('btnLB').addEventListener('click', openLeaderboard);
+  document.getElementById('btnViewLB').addEventListener('click', () => {
+    endScreen.classList.add('hidden');
+    openLeaderboard();
+  });
+  document.getElementById('btnLBBack').addEventListener('click', () => {
+    hideAllOverlays(); menu.classList.remove('hidden');
+  });
+  document.getElementById('btnLBRefresh').addEventListener('click', () => {
+    lbCache = null; renderLeaderboardTab();
+  });
+  document.querySelectorAll('.lb-tab').forEach(b => {
+    b.addEventListener('click', () => {
+      lbCurrentTab = b.dataset.tab;
+      document.querySelectorAll('.lb-tab').forEach(x => x.classList.toggle('selected', x === b));
+      renderLeaderboardTab();
+    });
+  });
+  document.getElementById('submitNick').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btnSubmitScore').click();
+  });
+
+  // Buttons
+  document.querySelectorAll('button.retro[data-mode]').forEach(b => {
+    b.addEventListener('click', () => startSoloGame(b.dataset.mode));
+  });
+  document.getElementById('btnRetry').addEventListener('click', () => {
+    if (state && state.mp) { endScreen.classList.add('hidden'); openLobby(); }
+    else if (state) startSoloGame(state.mode);
+  });
+  document.getElementById('btnMenu').addEventListener('click', () => {
+    cleanupMatch(); endScreen.classList.add('hidden');
+    menu.classList.remove('hidden');
+    hud.classList.add('hidden');
+    powerupsEl.classList.add('hidden');
+    matterBar.classList.add('hidden');
+    state = null;
+  });
+  window.addEventListener('keydown', e => {
+    if (!state || !state.running) return;
+    if (state.role === 'matter') {
+      const m = MATTER_TYPES.find(mt => mt.key === e.key);
+      if (m) selectMatter(m.id);
+    } else {
+      const p = POWERS.find(p => p.key === e.key);
+      if (p) activatePower(p.id);
+    }
+  });
+
+  // ============================================================
+  // NICKNAME + LOBBY
+  // ============================================================
+  let ws = null;
+  let myId = null, myCode = null, myNick = null;
+  let inviteSelectedMode = 'competition';
+  let inviteSelectedDifficulty = 'easy';
+  let inviteSelectedRole = 'qubit';
+  let currentInvite = null;
+  let onlinePlayers = [];
+
+  const nickInput = document.getElementById('nickInput');
+  const meNickEl = document.getElementById('meNick');
+  const meCodeEl = document.getElementById('meCode');
+  const lobbySub = document.getElementById('lobbySub');
+  const lobbyStatus = document.getElementById('lobbyStatus');
+  const playerList = document.getElementById('playerList');
+  const onlineCount = document.getElementById('onlineCount');
+  const codeInput = document.getElementById('codeInput');
+  const compRow = document.getElementById('compRow');
+  const roleRow = document.getElementById('roleRow');
+
+  // Load saved nickname
+  try {
+    const saved = localStorage.getItem('qubit_nick');
+    if (saved) nickInput.value = saved;
+  } catch {}
+
+  document.getElementById('btnMP').addEventListener('click', () => {
+    hideAllOverlays();
+    nickScreen.classList.remove('hidden');
+    nickInput.focus();
+  });
+  document.getElementById('btnNickBack').addEventListener('click', () => {
+    hideAllOverlays(); menu.classList.remove('hidden');
+  });
+  document.getElementById('btnNickGo').addEventListener('click', submitNick);
+  nickInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitNick(); });
+
+  function submitNick() {
+    const nick = nickInput.value.trim();
+    if (!nick) { document.getElementById('nickStatus').textContent = 'Nickname required.'; return; }
+    try { localStorage.setItem('qubit_nick', nick); } catch {}
+    myNick = nick;
+    openLobby();
+  }
+
+  function openLobby() {
+    hideAllOverlays();
+    lobbyScreen.classList.remove('hidden');
+    meNickEl.textContent = myNick;
+    if (!myCode) meCodeEl.textContent = '-----';
+    if (!ws || ws.readyState === WebSocket.CLOSED) connectWS();
+    else if (ws.readyState === WebSocket.OPEN) {
+      // re-hello with current nick (rename)
+      ws.send(JSON.stringify({ t: 'rename', nick: myNick }));
+    }
+  }
+
+  function connectWS() {
+    if (useHttpRelay()) {
+      lobbySub.textContent = 'CONNECTING TO HTTPS RELAY...';
+      setConn('connecting');
+      ws = createPollingSocket(myNick);
+      ws.onopen = () => {
+        setConn('ok');
+      };
+      ws.onclose = () => {
+        setConn('bad');
+        lobbySub.textContent = 'DISCONNECTED — reopen multiplayer to retry';
+        if (state && state.mp && state.running) gameOver('quantum link lost');
+      };
+      ws.onerror = () => { setConn('bad'); };
+      ws.onmessage = e => {
+        let msg; try { msg = JSON.parse(e.data); } catch { return; }
+        handleServerMessage(msg);
+      };
+      ws.open();
+      return;
+    }
+
+    const url = (location.protocol === 'file:'
+      ? 'ws://localhost:8080/'
+      : (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/');
+    lobbySub.textContent = 'CONNECTING TO ' + url + '...';
+    setConn('connecting');
+    try { ws = new WebSocket(url); } catch (e) { lobbySub.textContent = 'CONNECTION FAILED'; setConn('bad'); return; }
+    ws.onopen = () => {
+      setConn('ok');
+      ws.send(JSON.stringify({ t: 'hello', nick: myNick }));
+    };
+    ws.onclose = () => {
+      setConn('bad');
+      lobbySub.textContent = 'DISCONNECTED — reopen multiplayer to retry';
+      if (state && state.mp && state.running) gameOver('quantum link lost');
+    };
+    ws.onerror = () => { setConn('bad'); };
+    ws.onmessage = e => {
+      let msg; try { msg = JSON.parse(e.data); } catch { return; }
+      handleServerMessage(msg);
+    };
+  }
+
+  function useHttpRelay() {
+    return location.protocol === 'https:' && /\.ssh\.codes$/i.test(location.hostname);
+  }
+
+  function createPollingSocket(nick) {
+    const socket = {
+      readyState: WebSocket.CONNECTING,
+      id: null,
+      onopen: null,
+      onclose: null,
+      onerror: null,
+      onmessage: null,
+      _closed: false,
+      _sendChain: Promise.resolve(),
+      async open() {
+        try {
+          const result = await pollPost('/api/poll/open', { nick });
+          if (this._closed) return;
+          this.id = result.id;
+          this.readyState = WebSocket.OPEN;
+          if (this.onopen) this.onopen();
+          this._deliver(result.events);
+          this._poll();
+        } catch (e) {
+          this._fail(e);
+        }
+      },
+      send(raw) {
+        if (this.readyState !== WebSocket.OPEN || !this.id) return;
+        let msg;
+        try { msg = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return; }
+        this._sendChain = this._sendChain.then(async () => {
+          if (this._closed) return;
+          const result = await pollPost('/api/poll/send', { id: this.id, msg });
+          this._deliver(result.events);
+        }).catch(e => this._fail(e));
+      },
+      close() {
+        if (this._closed) return;
+        this._closed = true;
+        this.readyState = WebSocket.CLOSED;
+        if (this.id) {
+          fetch(apiBase() + '/api/poll/close', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: this.id }),
+            keepalive: true
+          }).catch(() => {});
+        }
+        if (this.onclose) this.onclose();
+      },
+      async _poll() {
+        while (!this._closed && this.readyState === WebSocket.OPEN) {
+          try {
+            const r = await fetch(apiBase() + '/api/poll/events?id=' + encodeURIComponent(this.id), { cache: 'no-cache' });
+            const result = await r.json();
+            if (!r.ok || !result.ok) throw new Error(result.reason || 'poll failed');
+            this._deliver(result.events);
+          } catch (e) {
+            if (!this._closed) this._fail(e);
+            return;
+          }
+        }
+      },
+      _deliver(events) {
+        for (const msg of events || []) {
+          if (this.onmessage) this.onmessage({ data: JSON.stringify(msg) });
+        }
+      },
+      _fail(err) {
+        if (this._closed) return;
+        this._closed = true;
+        this.readyState = WebSocket.CLOSED;
+        if (this.onerror) this.onerror(err);
+        if (this.onclose) this.onclose();
+      }
+    };
+    return socket;
+  }
+
+  async function pollPost(path, body) {
+    const r = await fetch(apiBase() + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const result = await r.json();
+    if (!r.ok || !result.ok) throw new Error(result.reason || 'poll request failed');
+    return result;
+  }
+
+  function setConn(s) {
+    connBadge.classList.remove('hidden', 'ok', 'bad');
+    if (s === 'ok') { connBadge.classList.add('ok'); connBadge.textContent = 'LINK OK'; }
+    else if (s === 'bad') { connBadge.classList.add('bad'); connBadge.textContent = 'LINK LOST'; }
+    else { connBadge.textContent = 'LINKING...'; }
+  }
+
+  function handleServerMessage(msg) {
+    if (msg.t === 'welcome') {
+      myId = msg.id; myCode = msg.code;
+      meCodeEl.textContent = msg.code.toUpperCase();
+      meNickEl.textContent = msg.nick;
+      myNick = msg.nick;
+      lobbySub.textContent = 'YOU ARE ONLINE';
+      lobbyStatus.textContent = 'Pick a mode and tap a player, or enter their code.';
+    } else if (msg.t === 'lobby') {
+      onlinePlayers = msg.players.filter(p => p.id !== myId);
+      renderPlayerList();
+    } else if (msg.t === 'invite') {
+      currentInvite = msg;
+      showInvite(msg);
+    } else if (msg.t === 'invite-sent') {
+      lobbyStatus.textContent = 'Invite sent to ' + msg.toNick + '. Waiting...';
+    } else if (msg.t === 'invite-fail') {
+      lobbyStatus.textContent = 'INVITE FAILED: ' + msg.reason;
+    } else if (msg.t === 'declined') {
+      lobbyStatus.textContent = msg.nick + ' DECLINED YOUR INVITE';
+    } else if (msg.t === 'match') {
+      startMpGame(msg);
+    } else if (msg.t === 'match-fail') {
+      lobbyStatus.textContent = 'MATCH FAILED: ' + msg.reason;
+    } else if (msg.t === 'match-end') {
+      if (state && state.mp && state.running) {
+        showToast('MATCH ENDED: ' + (msg.reason || 'peer left'));
+        gameOver('match ended');
+      }
+    } else if (msg.t === 'relay') {
+      handlePeerMessage(msg.data);
+    } else if (msg.t === 'renamed') {
+      myNick = msg.nick; meNickEl.textContent = msg.nick;
+    }
+  }
+
+  function renderPlayerList() {
+    onlineCount.textContent = '(' + onlinePlayers.length + ')';
+    if (!onlinePlayers.length) {
+      playerList.innerHTML = '<div class="empty">No other operators in the field...</div>';
+      return;
+    }
+    playerList.innerHTML = '';
+    for (const p of onlinePlayers) {
+      const row = document.createElement('div');
+      row.className = 'player-row';
+      row.innerHTML = `<div>${escapeHtml(p.nick)}</div><div class="pcode">${p.code.toUpperCase()} ›</div>`;
+      row.addEventListener('click', () => sendInvite(p.id));
+      playerList.appendChild(row);
+    }
+  }
+  function escapeHtml(s) { return s.replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','"':'&quot;'})[c]); }
+
+  function sendInvite(toId, toCode) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const payload = {
+      t: 'invite',
+      to: toCode || toId,
+      mode: inviteSelectedMode,
+      difficulty: inviteSelectedDifficulty,
+      role: inviteSelectedRole
+    };
+    ws.send(JSON.stringify(payload));
+  }
+
+  document.getElementById('btnInviteByCode').addEventListener('click', () => {
+    const c = codeInput.value.trim().toLowerCase();
+    if (c.length !== 5) { lobbyStatus.textContent = 'Code must be 5 characters.'; return; }
+    sendInvite(null, c);
+  });
+
+  document.querySelectorAll('.mode-pick').forEach(b => {
+    b.addEventListener('click', () => {
+      inviteSelectedMode = b.dataset.pick;
+      document.querySelectorAll('.mode-pick').forEach(x => x.classList.toggle('selected', x === b));
+      compRow.classList.toggle('hidden', inviteSelectedMode !== 'competition');
+      roleRow.classList.toggle('hidden', inviteSelectedMode !== 'qvm');
+    });
+  });
+  document.querySelectorAll('.diff-pick').forEach(b => {
+    b.addEventListener('click', () => {
+      inviteSelectedDifficulty = b.dataset.diff;
+      document.querySelectorAll('.diff-pick').forEach(x => x.classList.toggle('selected', x === b));
+    });
+  });
+  document.querySelectorAll('.role-pick').forEach(b => {
+    b.addEventListener('click', () => {
+      inviteSelectedRole = b.dataset.role;
+      document.querySelectorAll('.role-pick').forEach(x => x.classList.toggle('selected', x === b));
+    });
+  });
+
+  document.getElementById('btnRename').addEventListener('click', () => {
+    hideAllOverlays(); nickScreen.classList.remove('hidden'); nickInput.focus();
+  });
+  document.getElementById('btnLobbyLeave').addEventListener('click', () => {
+    if (ws) try { ws.close(); } catch {}
+    ws = null;
+    hideAllOverlays(); menu.classList.remove('hidden');
+    connBadge.classList.add('hidden');
+  });
+
+  function showInvite(inv) {
+    const modeLabel = inv.mode === 'qvm'
+      ? 'QUBIT vs MATTER — they want to be ' + inv.role.toUpperCase() + ' (you = ' + (inv.role === 'qubit' ? 'MATTER' : 'QUBIT') + ')'
+      : 'COMPETITION — ' + (inv.difficulty || 'normal').toUpperCase();
+    document.getElementById('inviteFromNick').textContent = 'FROM: ' + inv.fromNick;
+    document.getElementById('inviteMode').textContent = modeLabel;
+    inviteScreen.classList.remove('hidden');
+  }
+  document.getElementById('btnAccept').addEventListener('click', () => {
+    if (!currentInvite) return;
+    ws.send(JSON.stringify({ t: 'accept', inviteId: currentInvite.inviteId }));
+    inviteScreen.classList.add('hidden');
+    currentInvite = null;
+  });
+  document.getElementById('btnDecline').addEventListener('click', () => {
+    if (!currentInvite) return;
+    ws.send(JSON.stringify({ t: 'decline', inviteId: currentInvite.inviteId }));
+    inviteScreen.classList.add('hidden');
+    currentInvite = null;
+  });
+
+  // ============================================================
+  // MULTIPLAYER NETWORK (relay through server)
+  // ============================================================
+  function mpSend(data) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    try { ws.send(JSON.stringify({ t: 'relay', data })); } catch {}
+  }
+
+  function mpTick() {
+    if (!state.mp) return;
+    const now = state.t;
+    // Send own qubit position (qubit role) at 25Hz
+    if (state.role !== 'matter' && now - state.lastPosSent > 0.04) {
+      mpSend({ t: 'pos', x: state.qubit.x, y: state.qubit.y, time: now });
+      state.lastPosSent = now;
+    }
+    // Snapshot at ~20Hz from authoritative side. Cap raised so a busy field fully syncs.
+    const sendsSnap = (state.gameMode === 'competition' && state.mp.isHost) || (state.gameMode === 'qvm' && state.role === 'qubit');
+    if (sendsSnap && now - state.lastSnapshotSent > 0.05) {
+      const snap = state.particles.slice(0, 150).map(p => [p.id, p.type[0], Math.round(p.x), Math.round(p.y), Math.round(p.vx), Math.round(p.vy), Math.round(p.life * 10)]);
+      mpSend({ t: 'snap', ps: snap });
+      state.lastSnapshotSent = now;
+    }
+    // Time updates
+    if (now - state.lastTimeSent > 0.5) {
+      mpSend({ t: 'time', s: state.iAmDead ? state.deadAt : now });
+      state.lastTimeSent = now;
+    }
+  }
+
+  function handlePeerMessage(msg) {
+    if (!state || !state.mp) return;
+    if (msg.t === 'pos') {
+      // Smooth toward reported position rather than hard-snap (each msg arrives ~25Hz with jitter).
+      state.peerState.tx = msg.x; state.peerState.ty = msg.y;
+      state.peerState.lastUpdate = state.t;
+      hudOppTime.textContent = (msg.time || 0).toFixed(1) + 's';
+    } else if (msg.t === 'time') {
+      hudOppTime.textContent = (msg.s || 0).toFixed(1) + 's';
+    } else if (msg.t === 'snap') {
+      // Receive authoritative particle snapshot
+      const incoming = msg.ps;
+      const byId = new Map(); for (const p of state.particles) byId.set(p.id, p);
+      const seen = new Set();
+      const typeMap = { n: 'normal', l: 'light', d: 'dark', a: 'anti' };
+      for (const s of incoming) {
+        const [id, tch, x, y, vx, vy, l10] = s;
+        seen.add(id);
+        const type = typeMap[tch] || 'normal';
+        let p = byId.get(id);
+        if (!p) {
+          state.particles.push({
+            id, type, x, y, tx: x, ty: y, vx, vy,
+            r: type === 'light' ? 3 : (type === 'dark' ? 7 : 5),
+            color: COLORS[type],
+            life: l10/10, maxLife: 14, trail: [],
+            trackUntil: type === 'dark' ? 5 : 0, baseSpeed: Math.hypot(vx, vy)
+          });
+        } else {
+          // Update target only; render position smoothly chases it in update().
+          // Soft blend the target itself to avoid jumps when a delayed snapshot
+          // arrives behind our dead-reckoned target.
+          p.tx = (p.tx !== undefined ? p.tx * 0.25 : x) + x * 0.75;
+          p.ty = (p.ty !== undefined ? p.ty * 0.25 : y) + y * 0.75;
+          p.vx = vx; p.vy = vy; p.life = l10/10;
+        }
+      }
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        if (!seen.has(state.particles[i].id)) state.particles.splice(i, 1);
+      }
+    } else if (msg.t === 'pow') {
+      const color = ({super:'#00ff41',schro:'#7CFFB2',tunnel:'#22d3ee',collapse:'#facc15',decoh:'#60a5fa',pauli:'#f472b6',heis:'#fb923c'})[msg.id] || '#22d3ee';
+      spawnRing(msg.x, msg.y, 10, 80, 0.6, color);
+      spawnSparks(msg.x, msg.y, 10, 140, 0.5, color);
+    } else if (msg.t === 'shoot') {
+      // QvM: matter player commanded a shot. We (qubit player) spawn it.
+      if (state.gameMode === 'qvm' && state.role === 'qubit') {
+        pushAimedParticle(msg.mt, msg.x, msg.y, state.qubit);
+      }
+    } else if (msg.t === 'dead') {
+      state.peerDead = true;
+      state.peerSurvived = msg.survived || 0;
+      hudOppTime.textContent = state.peerSurvived.toFixed(1) + 's ✕';
+      if (state.gameMode === 'competition') {
+        if (state.iAmDead) finishMpMatch();
+        else showToast(state.mp.peerNick + ' DECOHERED — survive to win!');
+      }
+    }
+  }
+
+  function cleanupMatch() {
+    if (state && state.mp && ws && ws.readyState === WebSocket.OPEN) {
+      try { ws.send(JSON.stringify({ t: 'leave-match' })); } catch {}
+    }
+  }
+
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toastEl.classList.remove('show'), 2400);
+  }
+
+})();
+</script>
+</body>
+</html>
