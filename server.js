@@ -31,6 +31,8 @@ const BLOCKED_NICK_PARTS = [
   'pussy',
   'asshole',
   'bastard',
+  'butt',
+  'lickedabutt',
   'nigger',
   'nigga',
   'faggot',
