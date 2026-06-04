@@ -13,15 +13,115 @@ const PORT = process.env.PORT || 8080;
 const LB_FILE = path.join(__dirname, 'leaderboard.json');
 const MODES = ['easy', 'normal', 'hard'];
 const TOP_N = 10;
+const NICK_MAX = 18;
+const NICK_ALLOWED_RE = /^[a-z0-9 _.-]+$/i;
+const BLOCKED_NICK_EXACT = new Set([
+  'kys',
+  'kkk'
+]);
+const BLOCKED_NICK_PARTS = [
+  'fuck',
+  'shit',
+  'bitch',
+  'cunt',
+  'whore',
+  'slut',
+  'dick',
+  'cock',
+  'pussy',
+  'asshole',
+  'bastard',
+  'nigger',
+  'nigga',
+  'faggot',
+  'retard',
+  'hitler',
+  'nazi',
+  'porn',
+  'killyourself'
+];
 let leaderboard = { easy: [], normal: [], hard: [] };
+let leaderboardChanged = false;
 try {
   if (fs.existsSync(LB_FILE)) {
     const loaded = JSON.parse(fs.readFileSync(LB_FILE, 'utf8'));
-    for (const m of MODES) leaderboard[m] = Array.isArray(loaded[m]) ? loaded[m] : [];
+    for (const m of MODES) leaderboard[m] = sanitizeLeaderboardRows(loaded[m]);
+    if (leaderboardChanged) saveLeaderboard();
   }
 } catch (e) {
   console.warn('[QUBIT] leaderboard.json unreadable, starting fresh');
 }
+
+function normalizeNickname(raw) {
+  return String(raw ?? '')
+    .normalize('NFKC')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, NICK_MAX);
+}
+
+function profanityKey(nick) {
+  return nick
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[@4]/g, 'a')
+    .replace(/[3]/g, 'e')
+    .replace(/[1!|]/g, 'i')
+    .replace(/[0]/g, 'o')
+    .replace(/[$5]/g, 's')
+    .replace(/[7+]/g, 't')
+    .replace(/[8]/g, 'b')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function hasBlockedNickname(nick) {
+  const compact = profanityKey(nick);
+  const squashed = compact.replace(/(.)\1+/g, '$1');
+  if (BLOCKED_NICK_EXACT.has(compact) || BLOCKED_NICK_EXACT.has(squashed)) return true;
+  return BLOCKED_NICK_PARTS.some(part => compact.includes(part) || squashed.includes(part));
+}
+
+function validateNickname(raw) {
+  const nick = normalizeNickname(raw);
+  if (!nick) return { ok: false, reason: 'nickname required' };
+  if (!NICK_ALLOWED_RE.test(nick)) {
+    return { ok: false, reason: 'use letters, numbers, spaces, _, -, or .' };
+  }
+  if (hasBlockedNickname(nick)) return { ok: false, reason: 'nickname not allowed' };
+  return { ok: true, nick };
+}
+
+function nicknameOrDefault(raw) {
+  const checked = validateNickname(raw);
+  if (checked.ok) return checked;
+  return { ok: false, nick: 'qubit', reason: checked.reason };
+}
+
+function sanitizeLeaderboardRows(rows) {
+  if (!Array.isArray(rows)) {
+    leaderboardChanged = true;
+    return [];
+  }
+  const cleaned = [];
+  for (const row of rows) {
+    const nick = validateNickname(row && row.nick);
+    const time = Number(row && row.time);
+    if (!nick.ok || !isFinite(time) || time <= 0 || time > 3600) {
+      leaderboardChanged = true;
+      continue;
+    }
+    const near = Math.max(0, Math.floor(Number(row.near) || 0));
+    const when = Number(row.when) || Date.now();
+    const next = { nick: nick.nick, time: +time.toFixed(2), near, when };
+    if (JSON.stringify(next) !== JSON.stringify(row)) leaderboardChanged = true;
+    cleaned.push(next);
+  }
+  cleaned.sort((a, b) => b.time - a.time);
+  return cleaned.slice(0, 50);
+}
+
 function saveLeaderboard() {
   try { fs.writeFileSync(LB_FILE, JSON.stringify(leaderboard, null, 2)); } catch {}
 }
@@ -80,13 +180,13 @@ const server = http.createServer((req, res) => {
   if (url === '/api/score' && req.method === 'POST') {
     readJsonRequest(req, res, 4096, data => {
       const mode = String(data.mode || '');
-      const nick = String(data.nick || '').slice(0, 18).trim();
+      const nick = validateNickname(data.nick);
       const time = Number(data.time);
       const near = Math.max(0, Math.floor(Number(data.near) || 0));
       if (!MODES.includes(mode)) return jsonResp(res, 400, { ok: false, reason: 'bad mode' });
-      if (!nick) return jsonResp(res, 400, { ok: false, reason: 'nickname required' });
+      if (!nick.ok) return jsonResp(res, 400, { ok: false, reason: nick.reason });
       if (!isFinite(time) || time <= 0 || time > 3600) return jsonResp(res, 400, { ok: false, reason: 'bad time' });
-      const entry = { nick, time: +time.toFixed(2), near, when: Date.now() };
+      const entry = { nick: nick.nick, time: +time.toFixed(2), near, when: Date.now() };
       leaderboard[mode].push(entry);
       leaderboard[mode].sort((a, b) => b.time - a.time);
       leaderboard[mode] = leaderboard[mode].slice(0, 50); // keep more than we display
@@ -272,19 +372,24 @@ function handleClientMessage(ctx, msg) {
   const ws = ctx.ws;
 
   if (msg.t === 'hello') {
-    const nick = String(msg.nick || 'qubit').slice(0, 18).trim() || 'qubit';
+    const checkedNick = nicknameOrDefault(msg.nick || 'qubit');
     if (ctx.player) {
-      ctx.player.nick = nick;
-      send(ws, { t: 'renamed', nick });
+      if (!checkedNick.ok) {
+        send(ws, { t: 'nick-error', reason: checkedNick.reason, nick: ctx.player.nick });
+        return;
+      }
+      ctx.player.nick = checkedNick.nick;
+      send(ws, { t: 'renamed', nick: checkedNick.nick });
       broadcastLobby();
       return;
     }
     const id = crypto.randomUUID();
     const code = genCode();
-    ctx.player = { id, ws, nick, code, matchId: null, transport: ws.isPollTransport ? 'poll' : 'ws', lastSeen: Date.now() };
+    ctx.player = { id, ws, nick: checkedNick.nick, code, matchId: null, transport: ws.isPollTransport ? 'poll' : 'ws', lastSeen: Date.now() };
     players.set(id, ctx.player);
     codes.set(code, id);
-    send(ws, { t: 'welcome', id, code, nick });
+    send(ws, { t: 'welcome', id, code, nick: checkedNick.nick });
+    if (!checkedNick.ok) send(ws, { t: 'nick-error', reason: checkedNick.reason, nick: checkedNick.nick });
     broadcastLobby();
     return;
   }
@@ -365,12 +470,14 @@ function handleClientMessage(ctx, msg) {
   }
 
   if (msg.t === 'rename') {
-    const nick = String(msg.nick || '').slice(0, 18).trim();
-    if (nick) {
-      player.nick = nick;
-      send(ws, { t: 'renamed', nick });
-      broadcastLobby();
+    const checkedNick = validateNickname(msg.nick);
+    if (!checkedNick.ok) {
+      send(ws, { t: 'nick-error', reason: checkedNick.reason, nick: player.nick });
+      return;
     }
+    player.nick = checkedNick.nick;
+    send(ws, { t: 'renamed', nick: checkedNick.nick });
+    broadcastLobby();
   }
 }
 

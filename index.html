@@ -1411,8 +1411,14 @@
     };
 
     const onSubmit = async () => {
-      const nick = inp.value.trim();
-      if (!nick) { finish(false); return; }
+      if (!inp.value.trim()) { finish(false); return; }
+      const checked = cleanClientNickname(inp.value);
+      if (!checked.ok) {
+        document.getElementById('submitStatus').textContent = checked.reason;
+        return;
+      }
+      const nick = checked.nick;
+      inp.value = nick;
       try { localStorage.setItem('qubit_nick', nick); } catch {}
       document.getElementById('submitStatus').textContent = 'TRANSMITTING...';
       try {
@@ -1558,6 +1564,15 @@
   const compRow = document.getElementById('compRow');
   const roleRow = document.getElementById('roleRow');
 
+  function cleanClientNickname(raw) {
+    const nick = String(raw ?? '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 18);
+    if (!nick) return { ok: false, reason: 'Nickname required.' };
+    if (!/^[a-z0-9 _.-]+$/i.test(nick)) {
+      return { ok: false, reason: 'Use letters, numbers, spaces, _, -, or .' };
+    }
+    return { ok: true, nick };
+  }
+
   // Load saved nickname
   try {
     const saved = localStorage.getItem('qubit_nick');
@@ -1576,8 +1591,10 @@
   nickInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitNick(); });
 
   function submitNick() {
-    const nick = nickInput.value.trim();
-    if (!nick) { document.getElementById('nickStatus').textContent = 'Nickname required.'; return; }
+    const checked = cleanClientNickname(nickInput.value);
+    if (!checked.ok) { document.getElementById('nickStatus').textContent = checked.reason; return; }
+    const nick = checked.nick;
+    nickInput.value = nick;
     try { localStorage.setItem('qubit_nick', nick); } catch {}
     myNick = nick;
     openLobby();
@@ -1743,6 +1760,7 @@
       meCodeEl.textContent = msg.code.toUpperCase();
       meNickEl.textContent = msg.nick;
       myNick = msg.nick;
+      try { localStorage.setItem('qubit_nick', msg.nick); } catch {}
       lobbySub.textContent = 'YOU ARE ONLINE';
       lobbyStatus.textContent = 'Pick a mode and tap a player, or enter their code.';
     } else if (msg.t === 'lobby') {
@@ -1770,6 +1788,13 @@
       handlePeerMessage(msg.data);
     } else if (msg.t === 'renamed') {
       myNick = msg.nick; meNickEl.textContent = msg.nick;
+      try { localStorage.setItem('qubit_nick', msg.nick); } catch {}
+    } else if (msg.t === 'nick-error') {
+      myNick = msg.nick || myNick;
+      if (msg.nick) meNickEl.textContent = msg.nick;
+      const text = 'NICKNAME REJECTED: ' + (msg.reason || 'not allowed');
+      lobbyStatus.textContent = text;
+      document.getElementById('nickStatus').textContent = text;
     }
   }
 
