@@ -45,6 +45,9 @@ const SCORE_GRACE_SECONDS = Math.max(1, Number(process.env.SCORE_GRACE_SECONDS) 
 const RUN_TOKEN_TTL_MS = Math.max(60000, Number(process.env.RUN_TOKEN_TTL_MS) || (SCORE_MAX_SECONDS + 60) * 1000);
 const NICK_MAX = 18;
 const NICK_ALLOWED_RE = /^[a-z0-9 _.-]+$/i;
+const PUBLIC_STATIC_FILES = new Set(['index.html', 'favicon.ico']);
+const PUBLIC_STATIC_DIRS = ['assets', 'public', 'static'];
+const PUBLIC_STATIC_EXTS = new Set(['.css', '.js', '.mjs', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.mp3', '.wav', '.ogg', '.json', '.txt']);
 const BLOCKED_NICK_EXACT = new Set([
   'kys',
   'kkk'
@@ -237,6 +240,16 @@ function topN(mode) {
   return (leaderboard[mode] || []).slice(0, TOP_N);
 }
 
+function isPublicStaticPath(routePath) {
+  if (!routePath || routePath.includes('\0')) return false;
+  const normalized = path.normalize(routePath);
+  if (normalized.startsWith('..') || path.isAbsolute(normalized)) return false;
+  if (normalized.split(path.sep).some(part => part.startsWith('.'))) return false;
+  if (PUBLIC_STATIC_FILES.has(normalized)) return true;
+  const topLevel = normalized.split(path.sep)[0];
+  return PUBLIC_STATIC_DIRS.includes(topLevel) && PUBLIC_STATIC_EXTS.has(path.extname(normalized).toLowerCase());
+}
+
 function pruneRunTokens(now = Date.now()) {
   for (const [token, run] of runTokens) {
     if (!run || run.expiresAt <= now) runTokens.delete(token);
@@ -360,19 +373,27 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Static files
-  let p = url;
-  if (p === '/') p = '/index.html';
-  const full = path.join(__dirname, p);
-  if (!full.startsWith(__dirname)) { res.writeHead(403); res.end(); return; }
-  // Don't serve the leaderboard file directly
-  if (path.basename(full) === 'leaderboard.json') { res.writeHead(403); res.end(); return; }
+  // Static files are allowlisted so backend code and project metadata stay private.
+  let routePath;
+  try {
+    routePath = url === '/' ? 'index.html' : decodeURIComponent(url).replace(/^\/+/, '');
+  } catch {
+    res.writeHead(400, { 'Cache-Control': 'no-store' });
+    res.end('bad path');
+    return;
+  }
+  if (!isPublicStaticPath(routePath)) {
+    res.writeHead(404, { 'Cache-Control': 'no-store' });
+    res.end('not found');
+    return;
+  }
+  const full = path.resolve(__dirname, routePath);
+  if (full !== __dirname && !full.startsWith(`${__dirname}${path.sep}`)) { res.writeHead(403, { 'Cache-Control': 'no-store' }); res.end(); return; }
   fs.readFile(full, (err, data) => {
-    if (err) { res.writeHead(404); res.end('not found'); return; }
+    if (err) { res.writeHead(404, { 'Cache-Control': 'no-store' }); res.end('not found'); return; }
     const ext = path.extname(full).toLowerCase();
     const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' }[ext] || 'application/octet-stream';
-    const headers = { 'Content-Type': mime };
-    if (ext === '.html') headers['Cache-Control'] = 'no-cache';
+    const headers = { 'Content-Type': mime, 'Cache-Control': 'no-store' };
     res.writeHead(200, headers);
     res.end(data);
   });
