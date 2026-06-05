@@ -8,6 +8,32 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 8080;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_MODERATION_URL = process.env.OPENAI_MODERATION_URL || 'https://api.openai.com/v1/moderations';
+const OPENAI_MODERATION_MODEL = process.env.OPENAI_MODERATION_MODEL || 'omni-moderation-latest';
+const OPENAI_MODERATION_TIMEOUT_MS = Math.max(1000, Number(process.env.OPENAI_MODERATION_TIMEOUT_MS) || 4000);
+const OPENAI_MODERATION_CACHE_TTL_MS = Math.max(0, Number(process.env.OPENAI_MODERATION_CACHE_TTL_MS) || 10 * 60 * 1000);
+const OPENAI_MODERATION_FAIL_OPEN = process.env.OPENAI_MODERATION_FAIL_OPEN === '1';
+const OPENAI_MODERATION_BLOCK_CATEGORIES = new Set(
+  String(process.env.OPENAI_MODERATION_BLOCK_CATEGORIES || [
+    'harassment',
+    'harassment/threatening',
+    'hate',
+    'hate/threatening',
+    'illicit',
+    'illicit/violent',
+    'self-harm',
+    'self-harm/intent',
+    'self-harm/instructions',
+    'sexual',
+    'sexual/minors',
+    'violence/graphic'
+  ].join(','))
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean)
+);
+const nicknameModerationCache = new Map();
 
 // ---- Leaderboard storage ----
 const LB_FILE = path.join(__dirname, 'leaderboard.json');
@@ -95,8 +121,84 @@ function validateNickname(raw) {
   return { ok: true, nick };
 }
 
-function nicknameOrDefault(raw) {
+function shouldBlockModerationResult(result) {
+  if (!result || !result.categories) return Boolean(result && result.flagged);
+  if (result.flagged) return true;
+  return [...OPENAI_MODERATION_BLOCK_CATEGORIES].some(category => result.categories[category]);
+}
+
+function getModerationCache(key) {
+  if (!OPENAI_MODERATION_CACHE_TTL_MS) return null;
+  const cached = nicknameModerationCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.when > OPENAI_MODERATION_CACHE_TTL_MS) {
+    nicknameModerationCache.delete(key);
+    return null;
+  }
+  return cached.result;
+}
+
+function setModerationCache(key, result) {
+  if (!OPENAI_MODERATION_CACHE_TTL_MS) return;
+  nicknameModerationCache.set(key, { when: Date.now(), result });
+  if (nicknameModerationCache.size > 500) {
+    const oldest = nicknameModerationCache.keys().next().value;
+    if (oldest !== undefined) nicknameModerationCache.delete(oldest);
+  }
+}
+
+async function moderateNicknameWithOpenAI(nick) {
+  if (!OPENAI_API_KEY) return { ok: true, skipped: true };
+
+  const cacheKey = profanityKey(nick);
+  const cached = getModerationCache(cacheKey);
+  if (cached) return cached;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPENAI_MODERATION_TIMEOUT_MS);
+  try {
+    const response = await fetch(OPENAI_MODERATION_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODERATION_MODEL,
+        input: nick
+      }),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      throw new Error(`OpenAI moderation ${response.status}: ${detail.slice(0, 160)}`);
+    }
+
+    const data = await response.json();
+    const blocked = shouldBlockModerationResult(data && data.results && data.results[0]);
+    const result = blocked ? { ok: false, reason: 'nickname not allowed' } : { ok: true };
+    setModerationCache(cacheKey, result);
+    return result;
+  } catch (err) {
+    console.warn('[QUBIT] OpenAI nickname moderation failed:', err && err.message ? err.message : err);
+    if (OPENAI_MODERATION_FAIL_OPEN) return { ok: true, skipped: true };
+    return { ok: false, reason: 'nickname moderation unavailable' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function validateNicknameForPublicUse(raw) {
   const checked = validateNickname(raw);
+  if (!checked.ok) return checked;
+  const moderated = await moderateNicknameWithOpenAI(checked.nick);
+  if (!moderated.ok) return moderated;
+  return checked;
+}
+
+async function nicknameOrDefault(raw) {
+  const checked = await validateNicknameForPublicUse(raw);
   if (checked.ok) return checked;
   return { ok: false, nick: 'qubit', reason: checked.reason };
 }
@@ -149,7 +251,10 @@ function readJsonRequest(req, res, maxBytes, cb) {
   req.on('end', () => {
     let data;
     try { data = JSON.parse(body || '{}'); } catch { return jsonResp(res, 400, { ok: false, reason: 'bad json' }); }
-    cb(data);
+    Promise.resolve(cb(data)).catch(err => {
+      console.error('[QUBIT] request handler failed:', err);
+      if (!res.writableEnded) jsonResp(res, 500, { ok: false, reason: 'server error' });
+    });
   });
 }
 
@@ -180,9 +285,9 @@ const server = http.createServer((req, res) => {
   }
 
   if (url === '/api/score' && req.method === 'POST') {
-    readJsonRequest(req, res, 4096, data => {
+    readJsonRequest(req, res, 4096, async data => {
       const mode = String(data.mode || '');
-      const nick = validateNickname(data.nick);
+      const nick = await validateNicknameForPublicUse(data.nick);
       const time = Number(data.time);
       const near = Math.max(0, Math.floor(Number(data.near) || 0));
       if (!MODES.includes(mode)) return jsonResp(res, 400, { ok: false, reason: 'bad mode' });
@@ -282,10 +387,10 @@ function pollPlayer(id) {
 }
 
 function handlePollOpen(req, res) {
-  readJsonRequest(req, res, 4096, data => {
+  readJsonRequest(req, res, 4096, async data => {
     const transport = createPollTransport();
     const ctx = { ws: transport, player: null };
-    handleClientMessage(ctx, { t: 'hello', nick: data.nick });
+    await handleClientMessage(ctx, { t: 'hello', nick: data.nick });
     if (!ctx.player) return jsonResp(res, 500, { ok: false, reason: 'could not open session' });
     ctx.player.transport = 'poll';
     ctx.player.lastSeen = Date.now();
@@ -294,11 +399,11 @@ function handlePollOpen(req, res) {
 }
 
 function handlePollSend(req, res) {
-  readJsonRequest(req, res, 8192, data => {
+  readJsonRequest(req, res, 8192, async data => {
     const player = pollPlayer(data.id);
     if (!player) return jsonResp(res, 404, { ok: false, reason: 'session not found' });
     if (!data.msg || typeof data.msg !== 'object') return jsonResp(res, 400, { ok: false, reason: 'bad message' });
-    handleClientMessage({ ws: player.ws, player }, data.msg);
+    await handleClientMessage({ ws: player.ws, player }, data.msg);
     jsonResp(res, 200, { ok: true, events: drainPollEvents(player.ws) });
   });
 }
@@ -370,11 +475,11 @@ function endMatch(matchId, reason) {
   broadcastLobby();
 }
 
-function handleClientMessage(ctx, msg) {
+async function handleClientMessage(ctx, msg) {
   const ws = ctx.ws;
 
   if (msg.t === 'hello') {
-    const checkedNick = nicknameOrDefault(msg.nick || 'qubit');
+    const checkedNick = await nicknameOrDefault(msg.nick || 'qubit');
     if (ctx.player) {
       if (!checkedNick.ok) {
         send(ws, { t: 'nick-error', reason: checkedNick.reason, nick: ctx.player.nick });
@@ -472,7 +577,7 @@ function handleClientMessage(ctx, msg) {
   }
 
   if (msg.t === 'rename') {
-    const checkedNick = validateNickname(msg.nick);
+    const checkedNick = await validateNicknameForPublicUse(msg.nick);
     if (!checkedNick.ok) {
       send(ws, { t: 'nick-error', reason: checkedNick.reason, nick: player.nick });
       return;
@@ -500,7 +605,7 @@ wss.on('connection', ws => {
   ws.on('message', raw => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
-    handleClientMessage(ctx, msg);
+    handleClientMessage(ctx, msg).catch(err => console.error('[QUBIT] websocket handler failed:', err));
   });
 
   ws.on('close', () => closeClient(ctx));
