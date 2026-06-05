@@ -37,3 +37,7 @@ Optional environment variables:
 
 - `OPENAI_MODERATION_MODEL`: defaults to `omni-moderation-latest`
 - `OPENAI_MODERATION_FAIL_OPEN=1`: allow locally clean nicknames if OpenAI moderation is unavailable
+
+## Leaderboard Validation
+
+Leaderboard submissions require a server-issued run token from `/api/run/start`. The token is one-time-use, mode-bound, and checked against real elapsed server time before `/api/score` accepts the submitted survival time.

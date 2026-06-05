@@ -34,11 +34,15 @@ const OPENAI_MODERATION_BLOCK_CATEGORIES = new Set(
     .filter(Boolean)
 );
 const nicknameModerationCache = new Map();
+const runTokens = new Map();
 
 // ---- Leaderboard storage ----
 const LB_FILE = path.join(__dirname, 'leaderboard.json');
 const MODES = ['easy', 'normal', 'hard'];
 const TOP_N = 10;
+const SCORE_MAX_SECONDS = 3600;
+const SCORE_GRACE_SECONDS = Math.max(1, Number(process.env.SCORE_GRACE_SECONDS) || 4);
+const RUN_TOKEN_TTL_MS = Math.max(60000, Number(process.env.RUN_TOKEN_TTL_MS) || (SCORE_MAX_SECONDS + 60) * 1000);
 const NICK_MAX = 18;
 const NICK_ALLOWED_RE = /^[a-z0-9 _.-]+$/i;
 const BLOCKED_NICK_EXACT = new Set([
@@ -212,7 +216,7 @@ function sanitizeLeaderboardRows(rows) {
   for (const row of rows) {
     const nick = validateNickname(row && row.nick);
     const time = Number(row && row.time);
-    if (!nick.ok || !isFinite(time) || time <= 0 || time > 3600) {
+    if (!nick.ok || !isFinite(time) || time <= 0 || time > SCORE_MAX_SECONDS) {
       leaderboardChanged = true;
       continue;
     }
@@ -232,6 +236,43 @@ function saveLeaderboard() {
 function topN(mode) {
   return (leaderboard[mode] || []).slice(0, TOP_N);
 }
+
+function pruneRunTokens(now = Date.now()) {
+  for (const [token, run] of runTokens) {
+    if (!run || run.expiresAt <= now) runTokens.delete(token);
+  }
+}
+
+function createRunToken(mode) {
+  pruneRunTokens();
+  const token = crypto.randomBytes(24).toString('base64url');
+  const now = Date.now();
+  runTokens.set(token, {
+    mode,
+    startedAt: now,
+    expiresAt: now + RUN_TOKEN_TTL_MS
+  });
+  if (runTokens.size > 5000) {
+    const oldest = runTokens.keys().next().value;
+    if (oldest !== undefined) runTokens.delete(oldest);
+  }
+  return token;
+}
+
+function validateRunToken(token, mode, time) {
+  const raw = String(token || '').trim();
+  if (!raw) return { ok: false, reason: 'missing run token' };
+  const run = runTokens.get(raw);
+  runTokens.delete(raw);
+  if (!run) return { ok: false, reason: 'run token expired' };
+  const now = Date.now();
+  if (run.expiresAt <= now) return { ok: false, reason: 'run token expired' };
+  if (run.mode !== mode) return { ok: false, reason: 'run mode mismatch' };
+  const elapsed = (now - run.startedAt) / 1000;
+  if (time > elapsed + SCORE_GRACE_SECONDS) return { ok: false, reason: 'score does not match run timer' };
+  return { ok: true };
+}
+
 function jsonResp(res, status, body) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
@@ -284,6 +325,19 @@ const server = http.createServer((req, res) => {
     return jsonResp(res, 200, out);
   }
 
+  if (url === '/api/run/start' && req.method === 'POST') {
+    readJsonRequest(req, res, 4096, data => {
+      const mode = String(data.mode || '');
+      if (!MODES.includes(mode)) return jsonResp(res, 400, { ok: false, reason: 'bad mode' });
+      return jsonResp(res, 200, {
+        ok: true,
+        token: createRunToken(mode),
+        maxSeconds: SCORE_MAX_SECONDS
+      });
+    });
+    return;
+  }
+
   if (url === '/api/score' && req.method === 'POST') {
     readJsonRequest(req, res, 4096, async data => {
       const mode = String(data.mode || '');
@@ -292,7 +346,9 @@ const server = http.createServer((req, res) => {
       const near = Math.max(0, Math.floor(Number(data.near) || 0));
       if (!MODES.includes(mode)) return jsonResp(res, 400, { ok: false, reason: 'bad mode' });
       if (!nick.ok) return jsonResp(res, 400, { ok: false, reason: nick.reason });
-      if (!isFinite(time) || time <= 0 || time > 3600) return jsonResp(res, 400, { ok: false, reason: 'bad time' });
+      if (!isFinite(time) || time <= 0 || time > SCORE_MAX_SECONDS) return jsonResp(res, 400, { ok: false, reason: 'bad time' });
+      const runCheck = validateRunToken(data.runToken, mode, time);
+      if (!runCheck.ok) return jsonResp(res, 400, { ok: false, reason: runCheck.reason });
       const entry = { nick: nick.nick, time: +time.toFixed(2), near, when: Date.now() };
       leaderboard[mode].push(entry);
       leaderboard[mode].sort((a, b) => b.time - a.time);
@@ -315,7 +371,9 @@ const server = http.createServer((req, res) => {
     if (err) { res.writeHead(404); res.end('not found'); return; }
     const ext = path.extname(full).toLowerCase();
     const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' }[ext] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': mime });
+    const headers = { 'Content-Type': mime };
+    if (ext === '.html') headers['Cache-Control'] = 'no-cache';
+    res.writeHead(200, headers);
     res.end(data);
   });
 });

@@ -537,7 +537,10 @@
       peerDead: false, peerSurvived: 0, peerState_local: null,
       // network throttles
       lastPosSent: 0, lastSnapshotSent: 0, lastTimeSent: 0,
-      iAmDead: false, deadAt: 0
+      iAmDead: false, deadAt: 0,
+      runToken: null,
+      runTokenPromise: null,
+      runTokenError: null
     };
   }
   function makeStars(n) {
@@ -1127,8 +1130,40 @@
   // ============================================================
   // LIFECYCLE
   // ============================================================
+  async function requestRunTokenFor(targetState, modeKey) {
+    targetState.runToken = null;
+    targetState.runTokenError = null;
+    try {
+      const r = await fetch(apiBase() + '/api/run/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: modeKey })
+      });
+      const j = await r.json();
+      if (!j.ok || !j.token) throw new Error(j.reason || 'run token unavailable');
+      if (state === targetState) targetState.runToken = j.token;
+      return j.token;
+    } catch (e) {
+      if (state === targetState) targetState.runTokenError = e && e.message ? e.message : 'run token unavailable';
+      return null;
+    }
+  }
+
+  function armRunToken(modeKey) {
+    const targetState = state;
+    if (!targetState) return;
+    targetState.runTokenPromise = requestRunTokenFor(targetState, modeKey);
+  }
+
+  async function getRunTokenForSubmit() {
+    if (!state) return null;
+    if (!state.runToken && state.runTokenPromise) await state.runTokenPromise;
+    return state.runToken;
+  }
+
   function startSoloGame(modeKey) {
     state = newState(modeKey, null);
+    armRunToken(modeKey);
     hideAllOverlays();
     hudMode.textContent = MODES[modeKey].name;
     hudCenter.style.display = 'none';
@@ -1145,6 +1180,7 @@
       peerNick: matchInfo.peerNick, peerId: matchInfo.peerId,
       isHost: matchInfo.isHost, gameMode: matchInfo.mode, role
     });
+    if (isCompetition) armRunToken(modeKey);
     hideAllOverlays();
     hudMode.textContent = isCompetition ? ('COMPETE // ' + MODES[modeKey].name) : 'QUBIT vs MATTER';
     hudCenter.style.display = 'block';
@@ -1421,14 +1457,20 @@
       inp.value = nick;
       try { localStorage.setItem('qubit_nick', nick); } catch {}
       document.getElementById('submitStatus').textContent = 'TRANSMITTING...';
+      const runToken = await getRunTokenForSubmit();
+      if (!runToken) {
+        document.getElementById('submitStatus').textContent = 'FAILED: RUN VALIDATION UNAVAILABLE';
+        return;
+      }
       try {
         const r = await fetch(apiBase() + '/api/score', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode, nick, time, near })
+          body: JSON.stringify({ mode, nick, time, near, runToken })
         });
         const j = await r.json();
         if (j.ok) {
+          if (state) state.runToken = null;
           lbLastSubmitted = { mode, nick, time };
           lbCache = null; // bust cache
           const rankEl = document.getElementById('endRank');
