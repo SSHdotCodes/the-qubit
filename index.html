@@ -410,6 +410,18 @@
   const guard = document.getElementById('tamperGuard');
   let devtoolsOpen = false;
 
+  // 0. Harden core prototypes BEFORE the game script runs. The common
+  //    console cheat for this game monkey-patches Array.prototype.push
+  //    (or splice/unshift) to drop enemy particles before they enter
+  //    the game's arrays. Freezing the prototypes makes those methods
+  //    non-writable + non-configurable, so `Array.prototype.push = fn`
+  //    silently no-ops and `Object.defineProperty(...)` throws — the
+  //    spawn arrays stay intact. Calling the existing methods (the game
+  //    itself) is unaffected; only re-defining them is blocked.
+  try { Object.freeze(Array.prototype); } catch (_) {}
+  try { Object.freeze(Object.prototype); } catch (_) {}
+  try { Object.freeze(Function.prototype); } catch (_) {}
+
   // 1. Suppress the right-click context menu (the usual path to
   //    "Inspect Element").
   document.addEventListener('contextmenu', e => e.preventDefault());
