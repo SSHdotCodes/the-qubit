@@ -62,6 +62,27 @@ const REPLAY_HIT_SLACK = 12;
 const REPLAY_MAX_GAP_SECONDS = 0.7;
 const REPLAY_MAX_SAMPLES = 45000;
 const REPLAY_MAX_BYTES = 1200000;
+// Anti-cheat hardening (round 3). All replay-validation only — no gameplay or
+// leaderboard changes. Every threshold is env-tunable so the operator can retune
+// without a redeploy if a legitimate edge case ever shows up.
+//
+// 1) Realistic field size. The exploit asked /api/run/start for a 4096x4096 arena;
+//    no real browser window is that large or square, and the huge sparse field makes
+//    dodging trivial. Tokens are now bound to a plausible device-sized field.
+const MAX_REPLAY_DIM = Math.max(640, Number(process.env.MAX_REPLAY_DIM) || 3840);   // 4K-wide ceiling
+const MAX_REPLAY_AREA = Math.max(640 * 480, Number(process.env.MAX_REPLAY_AREA) || (3840 * 2160));
+// 2) "Inhuman dodging" detector. A bot with full knowledge of the deterministic field
+//    can fly a path that never comes near a particle. Real survival on these modes is a
+//    constant stream of close calls. During replay the server independently measures how
+//    often the qubit enters a near-miss band and rejects long runs that are implausibly
+//    clean. Only engaged above REALISM_MIN_TIME so ordinary short runs are never touched.
+const REPLAY_REALISM_MIN_TIME = Math.max(0, Number(process.env.REPLAY_REALISM_MIN_TIME) || 300);
+const REPLAY_REALISM_BAND = Math.max(0, Number(process.env.REPLAY_REALISM_BAND) || 30);       // px beyond the hit radius
+const REPLAY_REALISM_WINDOW = Math.max(1, Number(process.env.REPLAY_REALISM_WINDOW) || 30);   // seconds per coverage bucket
+// Fraction of time-buckets that must contain a near-miss. Conservative by default
+// (a real long survival has close calls in nearly every bucket; the dodge bot had
+// effectively zero). Raise it to squeeze cheats harder, lower it if a legit edge case appears.
+const REPLAY_REALISM_COVERAGE = Math.min(1, Math.max(0, Number(process.env.REPLAY_REALISM_COVERAGE) || 0.4));
 const MODE_CONFIG = {
   normal:    { spawn: 0.55, speedMul: 1.04, antimatterChance: 0.20, lightChance: 0.28, darkChance: 0.12, energyChance: 0.00, electronChance: 0.008, falseChance: 0.008, neutrinoChance: 0.00 },
   hard:      { spawn: 0.29, speedMul: 1.24, antimatterChance: 0.28, lightChance: 0.34, darkChance: 0.11, energyChance: 0.008, electronChance: 0.008, falseChance: 0.008, neutrinoChance: 0.00 },
@@ -307,6 +328,22 @@ function clampReplayDimension(value, fallback) {
   return Math.max(320, Math.min(4096, n));
 }
 
+// Constrain a requested field to a realistic device size: each side <= MAX_REPLAY_DIM
+// and total area <= MAX_REPLAY_AREA (shrunk proportionally if needed, preserving aspect
+// so legitimate widescreen/portrait clients are unaffected). Bound into the signed token,
+// so a tampered /api/run/start cannot mint an oversized arena.
+function normalizeFieldSize(rawWidth, rawHeight) {
+  let width = Math.min(clampReplayDimension(rawWidth, 900), MAX_REPLAY_DIM);
+  let height = Math.min(clampReplayDimension(rawHeight, 600), MAX_REPLAY_DIM);
+  const area = width * height;
+  if (area > MAX_REPLAY_AREA) {
+    const scale = Math.sqrt(MAX_REPLAY_AREA / area);
+    width = Math.max(320, Math.round(width * scale));
+    height = Math.max(320, Math.round(height * scale));
+  }
+  return { width, height };
+}
+
 function makeRng(seed) {
   return { seed: (Number(seed) >>> 0) || 1 };
 }
@@ -477,8 +514,13 @@ function validateReplayProof(run, mode, time, proof) {
   const qubitR = 9;
   const endT = Math.max(0, time - 0.08);
 
+  // Inhuman-dodging measurement: which time buckets contained at least one near-miss
+  // against a live threat. Survival without close calls is a bot tell, not skill.
+  const grazedWindows = new Set();
+
   for (let simT = 0; simT <= endT; simT += REPLAY_DT) {
     const q = qubitAt(samples, simT, cursor);
+    let frameGrazed = false;
 
     for (const [id, def] of Object.entries(POWER_DEFS)) {
       const ps = powerState[id];
@@ -533,10 +575,24 @@ function validateReplayProof(run, mode, time, proof) {
       if (p.type !== 'electron') {
         const dist = Math.hypot(p.x - q.x, p.y - q.y);
         const hitR = Math.max(1, p.r + qubitR - REPLAY_HIT_SLACK);
-        if (dist < hitR && (!schroActive || p.type === 'dark' || p.type === 'energy' || p.type === 'falseQubit')) {
-          return { ok: false, reason: 'server replay detected collision' };
+        const isThreat = !schroActive || p.type === 'dark' || p.type === 'energy' || p.type === 'falseQubit';
+        if (isThreat) {
+          if (dist < hitR) return { ok: false, reason: 'server replay detected collision' };
+          if (dist < hitR + REPLAY_REALISM_BAND) frameGrazed = true;
         }
       }
+    }
+
+    if (frameGrazed) grazedWindows.add(Math.floor(simT / REPLAY_REALISM_WINDOW));
+  }
+
+  // Reject implausibly clean long runs (full-knowledge dodge bots). Short runs are
+  // never gated, so ordinary play is unaffected.
+  if (time >= REPLAY_REALISM_MIN_TIME) {
+    const totalWindows = Math.max(1, Math.ceil(endT / REPLAY_REALISM_WINDOW));
+    const needWindows = Math.ceil(totalWindows * REPLAY_REALISM_COVERAGE);
+    if (grazedWindows.size < needWindows) {
+      return { ok: false, reason: 'anti-cheat run implausibly clean' };
     }
   }
 
@@ -566,8 +622,7 @@ function createRunToken(mode, meta = {}) {
   pruneRunTokens();
   const now = Date.now();
   const seed = crypto.randomBytes(4).readUInt32LE(0) || 1;
-  const width = clampReplayDimension(meta.width, 900);
-  const height = clampReplayDimension(meta.height, 600);
+  const { width, height } = normalizeFieldSize(meta.width, meta.height);
   const payload = {
     v: 2,
     mode,
