@@ -19,6 +19,10 @@ PORT=8080 npm start
 
 Open `http://localhost:8080` in your browser.
 
+## Difficulty
+
+Solo play starts with a safe Tutorial that explains movement, particles, Dark Energy, and power-ups step by step. Scored solo and competition modes support Easy, Normal, and Hard. Normal and Hard can spawn rare Dark Energy, which creates a repulsion field around itself and can still collapse the qubit on contact. The time ramp increases spawn rate linearly by 10% per survived minute, capped at 2x the starting spawn rate.
+
 ## Nickname Moderation
 
 The server always runs a local nickname filter before names can appear in multiplayer or on leaderboards. If `OPENAI_API_KEY` is set, it also checks public nicknames with OpenAI moderation using `omni-moderation-latest`.

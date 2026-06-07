@@ -205,6 +205,96 @@
     pointer-events: none; opacity: 0; transition: opacity 0.2s;
   }
   .toast.show { opacity: 1; }
+  .tutorial-pop {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+    width: min(640px, calc(100vw - 24px)); z-index: 70;
+    max-height: calc(100vh - 24px); overflow-y: auto; overflow-x: hidden;
+    border: 1px solid rgba(34, 211, 238, 0.55); border-radius: 8px;
+    background: linear-gradient(180deg, rgba(6, 22, 30, 0.96) 0%, rgba(2, 10, 16, 0.97) 100%);
+    box-shadow:
+      0 0 0 1px rgba(34, 211, 238, 0.12),
+      0 18px 48px rgba(0, 0, 0, 0.6),
+      0 0 34px rgba(34, 211, 238, 0.28),
+      inset 0 0 24px rgba(34, 211, 238, 0.06);
+    padding: 16px 18px; pointer-events: auto; text-align: left;
+    animation: tutPopIn 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .tutorial-pop::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0.9; pointer-events: none;
+  }
+  .tutorial-pop::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: 8px;
+    background: repeating-linear-gradient(to bottom,
+      rgba(34,211,238,0) 0px, rgba(34,211,238,0) 3px,
+      rgba(34,211,238,0.04) 4px, rgba(34,211,238,0.04) 4px);
+    mix-blend-mode: screen;
+  }
+  @keyframes tutPopIn {
+    from { opacity: 0; transform: translate(-50%, 16px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+  }
+  .tutorial-top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 12px; position: relative; z-index: 1;
+  }
+  .tutorial-kicker {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--cyan); border: 1px solid rgba(34, 211, 238, 0.5);
+    border-radius: 999px; padding: 4px 11px; background: rgba(34, 211, 238, 0.08);
+    text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); white-space: nowrap;
+  }
+  .tutorial-kicker::before {
+    content: ''; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--cyan); box-shadow: 0 0 8px var(--cyan), 0 0 14px var(--cyan);
+    animation: tutDot 1.6s ease-in-out infinite;
+  }
+  @keyframes tutDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+  .tutorial-progress {
+    font-size: 10px; letter-spacing: 0.2em; color: #7fdce8;
+    white-space: nowrap; text-shadow: 0 0 6px rgba(34,211,238,0.35);
+  }
+  .tutorial-progress b { color: var(--cyan); font-weight: 700; }
+  .tutorial-track {
+    position: relative; height: 4px; border-radius: 999px;
+    background: rgba(34, 211, 238, 0.14); overflow: hidden;
+    margin-bottom: 14px; z-index: 1;
+  }
+  .tutorial-fill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+    border-radius: 999px; background: linear-gradient(90deg, #0ea5c4, var(--cyan));
+    box-shadow: 0 0 10px var(--cyan), 0 0 18px rgba(34,211,238,0.5);
+    transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .tutorial-pop h2 {
+    color: #eafdff; font-size: clamp(16px, 4.4vw, 20px);
+    letter-spacing: 0.16em; margin-bottom: 8px; line-height: 1.2;
+    text-shadow: 0 0 12px rgba(34, 211, 238, 0.55);
+    position: relative; z-index: 1;
+  }
+  .tutorial-pop p {
+    color: #aee6ef; font-size: clamp(12px, 3.4vw, 13.5px);
+    line-height: 1.6; letter-spacing: 0.04em; margin-bottom: 16px;
+    position: relative; z-index: 1;
+  }
+  .tutorial-actions {
+    display: flex; gap: 10px; align-items: center;
+    justify-content: space-between; flex-wrap: wrap;
+    position: relative; z-index: 1;
+  }
+  .tutorial-pop .retro.small { padding: 9px 16px; font-size: 12px; }
+  .tutorial-pop #btnTutorialNext { font-weight: bold; padding: 9px 22px; }
+  @media (max-width: 480px) {
+    .tutorial-pop { bottom: 12px; padding: 14px; width: calc(100vw - 16px); }
+    .tutorial-kicker { letter-spacing: 0.16em; padding: 3px 9px; }
+    .tutorial-actions .retro.small { flex: 1 1 0; }
+    .tutorial-pop #btnTutorialNext { flex: 1.5 1 0; }
+  }
   .lb-row {
     display: grid; grid-template-columns: 40px 1fr auto;
     align-items: center; gap: 10px;
@@ -243,15 +333,29 @@
 
   <div id="connBadge" class="conn-indicator hidden">OFFLINE</div>
   <div id="toast" class="toast"></div>
+  <div id="tutorialPop" class="tutorial-pop hidden" role="dialog" aria-live="polite" aria-label="Quantum training">
+    <div class="tutorial-top">
+      <span class="tutorial-kicker" id="tutorialKicker">CONTROLS</span>
+      <span class="tutorial-progress" id="tutorialProgress">STEP <b>1</b> / 12</span>
+    </div>
+    <div class="tutorial-track"><div class="tutorial-fill" id="tutorialFill"></div></div>
+    <h2 id="tutorialTitle">TUTORIAL</h2>
+    <p id="tutorialBody">Move the qubit.</p>
+    <div class="tutorial-actions">
+      <button class="retro small dim" id="btnTutorialExit">EXIT</button>
+      <button class="retro small cyan" id="btnTutorialNext">CONTINUE</button>
+    </div>
+  </div>
 
   <!-- MAIN MENU -->
   <div id="menu" class="overlay">
     <h1 class="title">THE QUBIT</h1>
     <div class="subtitle">A QUANTUM SURVIVAL GAME</div>
     <div class="modes">
-      <button class="retro" data-mode="easy">EASY<small>FEW PARTICLES // LEARN THE FIELD</small></button>
-      <button class="retro" data-mode="normal">NORMAL<small>STANDARD CHAOS // RECOMMENDED</small></button>
-      <button class="retro" data-mode="hard">HARD<small>QUANTUM STORM // VERY CHALLENGING</small></button>
+      <button class="retro" data-mode="tutorial">TUTORIAL<small>LEARN PARTICLES // PRACTICE SAFELY</small></button>
+      <button class="retro" data-mode="normal">EASY<small>STANDARD CHAOS // RECOMMENDED</small></button>
+      <button class="retro" data-mode="hard">NORMAL<small>QUANTUM STORM // CHALLENGING</small></button>
+      <button class="retro" data-mode="extraHard">HARD<small>RARE DARK ENERGY // BRUTAL FIELD</small></button>
       <button class="retro cyan" id="btnMP">MULTIPLAYER<small>LIVE LOBBY // INVITE BY CODE</small></button>
       <button class="retro dim" id="btnLB">LEADERBOARD<small>TOP OPERATORS PER MODE</small></button>
     </div>
@@ -260,6 +364,10 @@
       <div class="row"><span class="dot" style="background:#ffffff"></span>LIGHT (FAST)</div>
       <div class="row"><span class="dot" style="background:#a855f7"></span>DARK MATTER (TRACKS YOU)</div>
       <div class="row"><span class="dot" style="background:#ff3860"></span>ANTIMATTER (FASTER)</div>
+      <div class="row"><span class="dot" style="background:#38bdf8"></span>DARK ENERGY (REPELS)</div>
+      <div class="row"><span class="dot" style="background:#facc15"></span>ELECTRON (ATTRACTS)</div>
+      <div class="row"><span class="dot" style="background:#ff7ad9"></span>FALSE QUBIT (HUNTS YOU)</div>
+      <div class="row"><span class="dot" style="background:#5eead4"></span>NEUTRINO (HARD)</div>
       <div style="margin-top:12px">MOUSE OR FINGER &middot; KEYS 1-7 ACTIVATE POWERUPS</div>
     </div>
   </div>
@@ -302,9 +410,9 @@
         <button class="retro small mode-pick" data-pick="qvm">QUBIT vs MATTER</button>
       </div>
       <div class="row" id="compRow">
-        <button class="retro small diff-pick selected" data-diff="easy">EASY</button>
-        <button class="retro small diff-pick" data-diff="normal">NORMAL</button>
-        <button class="retro small diff-pick" data-diff="hard">HARD</button>
+        <button class="retro small diff-pick selected" data-diff="normal">EASY</button>
+        <button class="retro small diff-pick" data-diff="hard">NORMAL</button>
+        <button class="retro small diff-pick" data-diff="extraHard">HARD</button>
       </div>
       <div class="row hidden" id="roleRow">
         <button class="retro small role-pick selected" data-role="qubit">I AM QUBIT</button>
@@ -370,9 +478,9 @@
     <div class="subtitle">TOP QUANTUM OPERATORS</div>
     <div class="panel">
       <div class="row">
-        <button class="retro small lb-tab selected" data-tab="easy">EASY</button>
-        <button class="retro small lb-tab" data-tab="normal">NORMAL</button>
-        <button class="retro small lb-tab" data-tab="hard">HARD</button>
+        <button class="retro small lb-tab selected" data-tab="normal">EASY</button>
+        <button class="retro small lb-tab" data-tab="hard">NORMAL</button>
+        <button class="retro small lb-tab" data-tab="extraHard">HARD</button>
       </div>
       <div class="player-list" id="lbList" style="max-height:340px;margin-top:12px">
         <div class="empty">LOADING...</div>
@@ -411,6 +519,96 @@
   const endStats = document.getElementById('endStats');
   const connBadge = document.getElementById('connBadge');
   const toastEl = document.getElementById('toast');
+  const tutorialPop = document.getElementById('tutorialPop');
+  const tutorialTitle = document.getElementById('tutorialTitle');
+  const tutorialBody = document.getElementById('tutorialBody');
+  const btnTutorialNext = document.getElementById('btnTutorialNext');
+  const btnTutorialExit = document.getElementById('btnTutorialExit');
+  const tutorialKicker = document.getElementById('tutorialKicker');
+  const tutorialProgress = document.getElementById('tutorialProgress');
+  const tutorialFill = document.getElementById('tutorialFill');
+  const BASE_ARRAY_PUSH = Array.prototype.push;
+  const REPLAY_VERSION = 2;
+  const REPLAY_SAMPLE_INTERVAL = 0.05;
+  const MAX_REPLAY_SAMPLES = 40000;
+
+  function appendParticle(list, particle) {
+    list[list.length] = particle;
+    return list.length;
+  }
+
+  function runtimeIsModified() {
+    return Array.prototype.push !== BASE_ARRAY_PUSH;
+  }
+
+  function makeRng(seed) {
+    return { seed: (Number(seed) >>> 0) || 1 };
+  }
+
+  function seededRandom(rng) {
+    rng.seed = (rng.seed + 0x6D2B79F5) >>> 0;
+    let t = rng.seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+
+  function gameRandom() {
+    if (state && state.rng) return seededRandom(state.rng);
+    return Math.random();
+  }
+
+  function scoredRunNeedsProof(st) {
+    return st && !st.mp && st.mode !== 'tutorial' && st.role !== 'matter';
+  }
+
+  function initRunProof(targetState, seed, width, height) {
+    targetState.runSeed = Number(seed) >>> 0;
+    targetState.rng = makeRng(targetState.runSeed);
+    targetState.proofWidth = Math.max(320, Math.round(Number(width) || W || 0));
+    targetState.proofHeight = Math.max(320, Math.round(Number(height) || H || 0));
+    targetState.replaySamples = [];
+    targetState.replayPowers = [];
+    targetState.lastReplayAt = -Infinity;
+    targetState.nextSpawnAt = 0;
+    recordReplaySample(targetState, true);
+  }
+
+  function recordReplaySample(targetState, force) {
+    const st = targetState || state;
+    if (!st || !scoredRunNeedsProof(st) || !st.replaySamples) return;
+    if (!force && st.t - st.lastReplayAt < REPLAY_SAMPLE_INTERVAL) return;
+    if (st.replaySamples.length >= MAX_REPLAY_SAMPLES) {
+      st.runtimeTampered = true;
+      return;
+    }
+    st.lastReplayAt = st.t;
+    st.replaySamples[st.replaySamples.length] = [
+      Math.round(st.t * 100),
+      Math.round(st.qubit.x),
+      Math.round(st.qubit.y)
+    ];
+  }
+
+  function recordReplayPower(id) {
+    if (!state || !scoredRunNeedsProof(state) || !state.replayPowers) return;
+    state.replayPowers[state.replayPowers.length] = [Math.round(state.t * 100), id];
+  }
+
+  function buildRunProof(mode, time) {
+    if (!state || !scoredRunNeedsProof(state)) return null;
+    recordReplaySample(state, true);
+    return {
+      v: REPLAY_VERSION,
+      mode,
+      seed: state.runSeed,
+      w: state.proofWidth || Math.round(W),
+      h: state.proofHeight || Math.round(H),
+      time: +time.toFixed(2),
+      samples: state.replaySamples || [],
+      powers: state.replayPowers || []
+    };
+  }
 
   let DPR = Math.min(window.devicePixelRatio || 1, 2);
   let W = 0, H = 0;
@@ -450,11 +648,22 @@
   // GAME DATA
   // ============================================================
   const MODES = {
-    easy:   { name: 'EASY',   spawn: 1.10, speedMul: 0.85, antimatterChance: 0.10, lightChance: 0.18, darkChance: 0.10 },
-    normal: { name: 'NORMAL', spawn: 0.60, speedMul: 1.00, antimatterChance: 0.18, lightChance: 0.25, darkChance: 0.14 },
-    hard:   { name: 'HARD',   spawn: 0.32, speedMul: 1.20, antimatterChance: 0.26, lightChance: 0.30, darkChance: 0.20 }
+    tutorial:  { name: 'TUTORIAL',   spawn: 99.00, speedMul: 0.42, antimatterChance: 0.00, lightChance: 0.00, darkChance: 0.00, energyChance: 0.00, electronChance: 0.00, falseChance: 0.00, neutrinoChance: 0.00 },
+    normal:    { name: 'EASY',       spawn: 0.55, speedMul: 1.04, antimatterChance: 0.20, lightChance: 0.28, darkChance: 0.12, energyChance: 0.00, electronChance: 0.008, falseChance: 0.008, neutrinoChance: 0.00 },
+    hard:      { name: 'NORMAL',     spawn: 0.29, speedMul: 1.24, antimatterChance: 0.28, lightChance: 0.34, darkChance: 0.11, energyChance: 0.008, electronChance: 0.008, falseChance: 0.008, neutrinoChance: 0.00 },
+    extraHard: { name: 'HARD',       spawn: 0.23, speedMul: 1.38, antimatterChance: 0.32, lightChance: 0.37, darkChance: 0.13, energyChance: 0.014, electronChance: 0.014, falseChance: 0.014, neutrinoChance: 0.026 }
   };
-  const COLORS = { normal: '#00ff41', light: '#ffffff', dark: '#a855f7', anti: '#ff3860' };
+  const COLORS = { normal: '#00ff41', light: '#ffffff', dark: '#a855f7', anti: '#ff3860', energy: '#38bdf8', electron: '#facc15', falseQubit: '#ff7ad9', neutrino: '#5eead4' };
+  const PARTICLE_STATS = {
+    normal: { speed: 220, r: 5, trail: 8, track: 0, maxLife: 14 },
+    light:  { speed: 460, r: 3, trail: 14, track: 0, maxLife: 14 },
+    dark:   { speed: 130, r: 7, trail: 8, track: 5, maxLife: 14, trackForce: 180, maxTrackMul: 1.6 },
+    anti:   { speed: 340, r: 5, trail: 10, track: 0, maxLife: 14 },
+    energy: { speed: 115, r: 8, trail: 12, track: 0, maxLife: 16, repelR: 84 },
+    electron: { speed: 165, r: 5, trail: 14, track: 0, maxLife: 16, attractR: 112, attractBase: 180, attractForce: 520 },
+    falseQubit: { speed: 180, r: 9, trail: 18, track: 8, maxLife: 16, trackForce: 300, maxTrackMul: 2.15 },
+    neutrino: { speed: 460, r: 3, trail: 18, track: 0, maxLife: 22, bounces: 4 }
+  };
   const POWERS = [
     { id: 'super', key: '1', name: 'SUPERPOSITION', sym: 'Ψ', unlock: 30, charges: 2, duration: 20 },
     { id: 'schro', key: '2', name: "SCHRÖDINGER",   sym: 'S', unlock: 60, charges: 1, duration: 20 },
@@ -465,6 +674,67 @@
     { id: 'light',  key: '2', name: 'LIGHT',  cd: 0.85, color: COLORS.light  },
     { id: 'dark',   key: '3', name: 'DARK',   cd: 2.20, color: COLORS.dark   },
     { id: 'anti',   key: '4', name: 'ANTI',   cd: 1.30, color: COLORS.anti   }
+  ];
+  const TUTORIAL_STEPS = [
+    {
+      title: 'MOVE THE QUBIT',
+      body: 'Move your mouse or finger to guide the qubit. This tutorial is safe: particles demonstrate their behavior without ending the run.'
+    },
+    {
+      type: 'normal',
+      title: 'NORMAL MATTER',
+      body: 'Normal matter is green and travels in a straight line. In real runs, touching any matter collapses the qubit.'
+    },
+    {
+      type: 'light',
+      title: 'LIGHT',
+      body: 'Light is small, white, and very fast. It gives less warning, so dodge early instead of waiting until it is close.'
+    },
+    {
+      type: 'dark',
+      title: 'DARK MATTER',
+      body: 'Dark matter is purple and tracks you for a few seconds. It is slower, but it bends toward your position.'
+    },
+    {
+      type: 'anti',
+      title: 'ANTIMATTER',
+      body: 'Antimatter is red and fast. It moves directly and punishes lazy routes across the field.'
+    },
+    {
+      type: 'energy',
+      title: 'DARK ENERGY',
+      body: 'Dark energy is rare and blue. Its field blocks the qubit at the edge; forcing your way through pulls you slowly toward the collapsing core.'
+    },
+    {
+      type: 'electron',
+      title: 'ELECTRON',
+      body: 'Electrons are yellow force hazards. Enter the bubble and it pulls the qubit toward the center; move out decisively to escape before it drags you into a wall.'
+    },
+    {
+      type: 'falseQubit',
+      title: 'THE FALSE QUBIT',
+      body: 'The False Qubit looks like a corrupted copy of you. It tracks harder and longer than dark matter, so break away early instead of orbiting near it.'
+    },
+    {
+      power: 'super',
+      title: 'POWER-UP: SUPERPOSITION',
+      body: 'Superposition unlocks at 30 seconds in real runs. It gives temporary split movement and helps slip through tight patterns.'
+    },
+    {
+      power: 'schro',
+      title: 'POWER-UP: SCHRODINGER',
+      body: 'Schrodinger unlocks at 60 seconds. It lets you phase through most matter, but dark matter and dark energy are still dangerous.'
+    },
+    {
+      power: 'decoh',
+      title: 'POWER-UP: DECOHERENCE',
+      body: 'Decoherence unlocks at 90 seconds. It slows incoming matter around the qubit, giving you room to recover.'
+    },
+    {
+      done: true,
+      title: 'FIELD READY',
+      body: 'Tutorial complete. Start Easy when you want scored runs, or try Normal and Hard when you want the full rare-particle field.'
+    }
   ];
 
   const puEls = {};
@@ -540,7 +810,17 @@
       iAmDead: false, deadAt: 0,
       runToken: null,
       runTokenPromise: null,
-      runTokenError: null
+      runTokenError: null,
+      runSeed: null,
+      rng: null,
+      proofWidth: 0,
+      proofHeight: 0,
+      replaySamples: null,
+      replayPowers: null,
+      lastReplayAt: -Infinity,
+      nextSpawnAt: 0,
+      runtimeTampered: false,
+      tutorial: modeKey === 'tutorial' ? { step: -1, waiting: false, spawnDelay: 0, currentType: null } : null
     };
   }
   function makeStars(n) {
@@ -556,39 +836,56 @@
   // ============================================================
   function spawnParticle() {
     const cfg = state.cfg;
-    const roll = Math.random();
+    const roll = gameRandom();
+    const energyChance = cfg.energyChance || 0;
+    const electronChance = cfg.electronChance || 0;
+    const falseChance = cfg.falseChance || 0;
+    const neutrinoChance = cfg.neutrinoChance || 0;
     let type;
-    if (roll < cfg.antimatterChance) type = 'anti';
-    else if (roll < cfg.antimatterChance + cfg.lightChance) type = 'light';
-    else if (roll < cfg.antimatterChance + cfg.lightChance + cfg.darkChance) type = 'dark';
+    if (roll < energyChance) type = 'energy';
+    else if (roll < energyChance + electronChance) type = 'electron';
+    else if (roll < energyChance + electronChance + falseChance) type = 'falseQubit';
+    else if (roll < energyChance + electronChance + falseChance + neutrinoChance) type = 'neutrino';
+    else if (roll < energyChance + electronChance + falseChance + neutrinoChance + cfg.antimatterChance) type = 'anti';
+    else if (roll < energyChance + electronChance + falseChance + neutrinoChance + cfg.antimatterChance + cfg.lightChance) type = 'light';
+    else if (roll < energyChance + electronChance + falseChance + neutrinoChance + cfg.antimatterChance + cfg.lightChance + cfg.darkChance) type = 'dark';
     else type = 'normal';
-    const side = Math.floor(Math.random() * 4);
+    const side = Math.floor(gameRandom() * 4);
     const margin = 30;
     let x, y, ang;
-    if (side === 0)      { x = -margin;    y = Math.random() * H;  ang = (Math.random() - 0.5) * 0.9; }
-    else if (side === 1) { x = W + margin; y = Math.random() * H;  ang = Math.PI + (Math.random() - 0.5) * 0.9; }
-    else if (side === 2) { x = Math.random()*W; y = -margin;       ang = Math.PI / 2 + (Math.random() - 0.5) * 0.9; }
-    else                 { x = Math.random()*W; y = H + margin;    ang = -Math.PI / 2 + (Math.random() - 0.5) * 0.9; }
+    if (side === 0)      { x = -margin;    y = gameRandom() * H;  ang = (gameRandom() - 0.5) * 0.9; }
+    else if (side === 1) { x = W + margin; y = gameRandom() * H;  ang = Math.PI + (gameRandom() - 0.5) * 0.9; }
+    else if (side === 2) { x = gameRandom()*W; y = -margin;       ang = Math.PI / 2 + (gameRandom() - 0.5) * 0.9; }
+    else                 { x = gameRandom()*W; y = H + margin;    ang = -Math.PI / 2 + (gameRandom() - 0.5) * 0.9; }
     pushParticle(type, x, y, ang, cfg.speedMul);
   }
   function pushParticle(type, x, y, ang, speedMul) {
-    let speed;
-    if (type === 'normal') speed = 220;
-    else if (type === 'light') speed = 460;
-    else if (type === 'dark')  speed = 130;
-    else                       speed = 340;
+    const stats = particleStats(type);
+    let speed = stats.speed;
     speed *= (speedMul || 1);
-    const radius = type === 'light' ? 3 : (type === 'dark' ? 7 : 5);
-    state.particles.push({
+    appendParticle(state.particles, {
       id: nextPid++, type, x, y,
       vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
-      r: radius, color: COLORS[type],
-      life: 0, maxLife: 14, trail: [],
-      trackUntil: type === 'dark' ? 5 : 0, baseSpeed: speed
+      r: stats.r, color: COLORS[type] || COLORS.normal,
+      life: 0, maxLife: stats.maxLife, trail: [],
+      trackUntil: stats.track, repelR: stats.repelR || 0, attractR: stats.attractR || 0,
+      bouncesLeft: stats.bounces || 0, enteredField: false, baseSpeed: speed
     });
+  }
+  function particleStats(type) {
+    return PARTICLE_STATS[type] || PARTICLE_STATS.normal;
+  }
+  function particleDeathName(type) {
+    if (type === 'energy') return 'dark energy';
+    if (type === 'falseQubit') return 'the False Qubit';
+    if (type === 'electron') return 'electron';
+    if (type === 'neutrino') return 'neutrino';
+    if (type === 'anti') return 'antimatter';
+    return type + ' matter';
   }
   // For matter shooter — aim from edge nearest tap toward tap point, then continue toward qubit
   function pushAimedParticle(type, targetX, targetY, qubitPos) {
+    if (!MATTER_TYPES.some(m => m.id === type)) type = 'normal';
     // spawn from nearest edge toward target
     const sides = [
       { x: -30, y: targetY },
@@ -621,6 +918,7 @@
     if (def.duration > 0 && state.t < ps.activeUntil) return;
     ps.charges -= 1;
     ps.activeUntil = def.duration > 0 ? state.t + def.duration : state.t;
+    recordReplayPower(id);
     applyPowerEffect(id);
     if (state.mp) mpSend({ t: 'pow', id, x: state.qubit.x, y: state.qubit.y });
   }
@@ -695,12 +993,204 @@
       }
     }
   }
+  function applyDarkEnergyRepel(p, dt) {
+    const q = state.qubit;
+    const fieldR = p.repelR || particleStats('energy').repelR;
+    const edgeR = fieldR + q.r;
+    const coreR = Math.max(3, p.r * 0.4);
+    const dx = q.x - p.x, dy = q.y - p.y;
+    let dist = Math.hypot(dx, dy);
+    if (dist >= edgeR) {
+      p.energyGateDist = edgeR;
+      return;
+    }
+
+    let nx = dx / (dist || 1);
+    let ny = dy / (dist || 1);
+    if (dist < 0.001) {
+      nx = 1;
+      ny = 0;
+      dist = 1;
+    }
+
+    const pointerDist = Math.hypot(input.x - p.x, input.y - p.y);
+    const pushingIn = pointerDist < Math.min(dist, fieldR);
+    const prevGate = Number.isFinite(p.energyGateDist)
+      ? Math.max(coreR, Math.min(edgeR, p.energyGateDist))
+      : edgeR;
+
+    let gateDist;
+    if (pushingIn) {
+      gateDist = Math.max(coreR, prevGate - 24 * dt);
+      if (dist < gateDist) {
+        q.x = p.x + nx * gateDist;
+        q.y = p.y + ny * gateDist;
+        dist = gateDist;
+      }
+      p.energyGateDist = Math.min(edgeR, Math.max(gateDist, dist));
+    } else {
+      gateDist = edgeR;
+      q.x = p.x + nx * gateDist;
+      q.y = p.y + ny * gateDist;
+      dist = gateDist;
+      p.energyGateDist = edgeR;
+    }
+
+    q.x = Math.max(10, Math.min(W - 10, q.x));
+    q.y = Math.max(10, Math.min(H - 10, q.y));
+    if (!p.nearLogged && dist < edgeR - q.r * 0.5) {
+      p.nearLogged = true;
+      state.missCount++;
+    }
+  }
+  function applyElectronAttract(p, dt) {
+    const q = state.qubit;
+    const stats = particleStats('electron');
+    const attractR = p.attractR || stats.attractR;
+    const dx = p.x - q.x, dy = p.y - q.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist >= attractR || dist < 0.001) return;
+
+    const depth = 1 - dist / attractR;
+    const strength = 0.18 + Math.pow(depth, 0.55) * 0.82;
+    const pull = ((stats.attractBase || 180) + strength * (stats.attractForce || 520)) * strength * dt;
+    q.x += (dx / dist) * pull;
+    q.y += (dy / dist) * pull;
+    q.x = Math.max(10, Math.min(W - 10, q.x));
+    q.y = Math.max(10, Math.min(H - 10, q.y));
+
+    if (!p.nearLogged && dist < attractR * 0.7) {
+      p.nearLogged = true;
+      state.missCount++;
+    }
+
+    const hitWall = q.x <= 10.01 || q.x >= W - 10.01 || q.y <= 10.01 || q.y >= H - 10.01;
+    if (hitWall) {
+      p.remove = true;
+      spawnRing(p.x, p.y, 12, 58, 0.42, COLORS.electron);
+      spawnSparks(p.x, p.y, 8, 95, 0.38, COLORS.electron);
+    }
+  }
+  function updateNeutrinoBounce(p) {
+    if (p.x >= 0 && p.x <= W && p.y >= 0 && p.y <= H) p.enteredField = true;
+    if (!p.enteredField) return;
+
+    let side = '';
+    if (p.x < 0) { p.x = 0; side = 'left'; }
+    else if (p.x > W) { p.x = W; side = 'right'; }
+    if (p.y < 0) { p.y = 0; side = side || 'top'; }
+    else if (p.y > H) { p.y = H; side = side || 'bottom'; }
+    if (!side) return;
+
+    if (p.bouncesLeft <= 0) {
+      p.remove = true;
+      spawnSparks(p.x, p.y, 10, 130, 0.35, COLORS.neutrino);
+      return;
+    }
+
+    p.bouncesLeft--;
+    let ang;
+    if (side === 'left') ang = -Math.PI / 2 + gameRandom() * Math.PI;
+    else if (side === 'right') ang = Math.PI / 2 + gameRandom() * Math.PI;
+    else if (side === 'top') ang = gameRandom() * Math.PI;
+    else ang = Math.PI + gameRandom() * Math.PI;
+    const speed = Math.max(1, p.baseSpeed || particleStats('neutrino').speed);
+    p.vx = Math.cos(ang) * speed;
+    p.vy = Math.sin(ang) * speed;
+    spawnSparks(p.x, p.y, 6, 90, 0.28, COLORS.neutrino);
+  }
+  function spawnTutorialParticle(type) {
+    if (!state) return;
+    const y = H * (0.36 + Math.random() * 0.24);
+    const speedMul = type === 'light' ? 0.22 : 0.34;
+    if (type === 'energy') {
+      pushParticle('energy', W * 0.66, H * 0.5, 0, 0.01);
+      const p = state.particles[state.particles.length - 1];
+      if (p) { p.vx = 0; p.vy = 0; p.maxLife = 90; }
+      return;
+    }
+    if (type === 'electron') {
+      pushParticle('electron', W * 0.66, H * 0.5, 0, 0.01);
+      const p = state.particles[state.particles.length - 1];
+      if (p) { p.vx = 0; p.vy = 0; p.maxLife = 90; }
+      return;
+    }
+    pushParticle(type, W + 36, y, Math.PI + (Math.random() - 0.5) * 0.18, speedMul);
+    const p = state.particles[state.particles.length - 1];
+    if (p) p.maxLife = 90;
+  }
+  function tutorialKickerFor(step) {
+    if (step.done) return 'COMPLETE';
+    if (step.power) return 'POWER-UP';
+    if (step.type) return 'PARTICLE';
+    return 'CONTROLS';
+  }
+  function showTutorialStep() {
+    if (!state || !state.tutorial) return;
+    const step = TUTORIAL_STEPS[state.tutorial.step];
+    if (!step) return;
+    const total = TUTORIAL_STEPS.length;
+    const idx = Math.min(state.tutorial.step + 1, total);
+    tutorialTitle.textContent = step.title;
+    tutorialBody.textContent = step.body;
+    tutorialKicker.textContent = tutorialKickerFor(step);
+    tutorialProgress.innerHTML = 'STEP <b>' + idx + '</b> / ' + total;
+    tutorialFill.style.width = Math.round((idx / total) * 100) + '%';
+    btnTutorialNext.textContent = step.done ? 'START EASY' : 'CONTINUE';
+    tutorialPop.classList.remove('hidden');
+    state.tutorial.waiting = true;
+  }
+  function advanceTutorial() {
+    if (!state || !state.tutorial) return;
+    tutorialPop.classList.add('hidden');
+    state.tutorial.step += 1;
+    if (state.tutorial.step >= TUTORIAL_STEPS.length) {
+      startSoloGame('normal');
+      return;
+    }
+    const step = TUTORIAL_STEPS[state.tutorial.step];
+    state.tutorial.waiting = false;
+    state.particles = [];
+    state.effects = [];
+    state.missCount = 0;
+    state.tutorial.currentType = step.type || null;
+    if (step.type) {
+      spawnTutorialParticle(step.type);
+    }
+    if (step.power) {
+      for (const p of POWERS) {
+        const ps = state.powers[p.id];
+        ps.unlocked = true;
+        ps.charges = Math.max(ps.charges, p.id === step.power ? 1 : 0);
+      }
+      const ps = state.powers[step.power];
+      const def = POWERS.find(p => p.id === step.power);
+      if (ps && def && def.duration > 0) ps.activeUntil = state.t + 7;
+      applyPowerEffect(step.power);
+      updatePowerUI();
+    }
+    showTutorialStep();
+  }
+  function exitTutorial() {
+    tutorialPop.classList.add('hidden');
+    hud.classList.add('hidden');
+    powerupsEl.classList.add('hidden');
+    matterBar.classList.add('hidden');
+    state = null;
+    hideAllOverlays();
+    menu.classList.remove('hidden');
+  }
 
   // ============================================================
   // UPDATE
   // ============================================================
   function update(dt) {
+    if (scoredRunNeedsProof(state) && !state.runSeed) {
+      hudState.textContent = 'SYNCING FIELD';
+      return;
+    }
     state.t += dt;
+    if (state.mode !== 'tutorial' && runtimeIsModified()) state.runtimeTampered = true;
     for (const s of state.stars) s.tw += dt * 2;
 
     // === Decay animation phase ===
@@ -737,15 +1227,14 @@
     // Solo: spawn locally
     // Competition: host spawns
     // QvM: nobody auto-spawns; only matter player triggers via tryShoot
-    const isHostSpawner = state.gameMode === 'solo' || (state.gameMode === 'competition' && state.mp && state.mp.isHost);
+    const isTutorial = state.mode === 'tutorial';
+    const isHostSpawner = !isTutorial && (state.gameMode === 'solo' || (state.gameMode === 'competition' && state.mp && state.mp.isHost));
     if (isHostSpawner) {
-      state.spawnT -= dt;
-      // Very gradual difficulty ramp — spawns get faster the longer you survive.
-      // 0.0015/sec linear, capped so it can't go below 0.2× the base interval.
-      const ramp = Math.max(0.2, 1 - state.t * 0.0015);
-      if (state.spawnT <= 0) {
+      // Spawn rate increases linearly by 10% per survived minute, capped at 2×.
+      if (state.t >= state.nextSpawnAt) {
         spawnParticle();
-        state.spawnT = state.cfg.spawn * ramp * (0.6 + Math.random() * 0.8);
+        const ramp = Math.max(0.5, 1 / (1 + (state.t / 60) * 0.10));
+        state.nextSpawnAt = state.t + state.cfg.spawn * ramp * (0.6 + gameRandom() * 0.8);
       }
     }
 
@@ -759,17 +1248,20 @@
       const p = state.particles[i];
       p.life += dt;
       const speedMul = (isAuth && decohActive && state.role !== 'matter') ? 0.35 : 1.0;
-      if (isAuth && p.type === 'dark' && p.life < p.trackUntil && state.role !== 'matter') {
+      if (isAuth && (p.type === 'dark' || p.type === 'falseQubit') && p.life < p.trackUntil && state.role !== 'matter') {
+        const stats = particleStats(p.type);
         const dx = state.qubit.x - p.x, dy = state.qubit.y - p.y;
         const d = Math.hypot(dx, dy) || 1;
-        p.vx += (dx/d) * 180 * dt; p.vy += (dy/d) * 180 * dt;
+        const trackForce = stats.trackForce || 180;
+        p.vx += (dx/d) * trackForce * dt; p.vy += (dy/d) * trackForce * dt;
         const sp = Math.hypot(p.vx, p.vy);
-        const maxSp = p.baseSpeed * 1.6;
+        const maxSp = p.baseSpeed * (stats.maxTrackMul || 1.6);
         if (sp > maxSp) { p.vx = (p.vx/sp) * maxSp; p.vy = (p.vy/sp) * maxSp; }
       }
       if (isAuth) {
         p.x += p.vx * dt * speedMul;
         p.y += p.vy * dt * speedMul;
+        if (p.type === 'neutrino') updateNeutrinoBounce(p);
       } else {
         // Non-auth: render position smoothly chases a target that dead-reckons with
         // the latest snapshot velocity. This kills the snap/dead-reckon rubber-banding.
@@ -781,17 +1273,27 @@
         p.y += (p.ty - p.y) * k;
       }
       p.trail.push({ x: p.x, y: p.y });
-      const maxTrail = p.type === 'light' ? 14 : (p.type === 'anti' ? 10 : 8);
+      const maxTrail = particleStats(p.type).trail;
       if (p.trail.length > maxTrail) p.trail.shift();
+      if (p.remove) {
+        state.particles.splice(i, 1);
+        continue;
+      }
 
       // Collision only for qubit role
       if (state.role !== 'matter' && !state.iAmDead) {
+        if (p.type === 'energy') applyDarkEnergyRepel(p, dt);
+        if (p.type === 'electron') applyElectronAttract(p, dt);
         const dx2 = p.x - state.qubit.x, dy2 = p.y - state.qubit.y;
         const dist = Math.hypot(dx2, dy2);
         const hitR = p.r + state.qubit.r;
-        if (dist < hitR) {
-          // Schrödinger phases through everything EXCEPT dark matter — dark matter still kills.
-          if (!schroActive || p.type === 'dark') { gameOver('hit by ' + p.type + ' matter'); return; }
+        if (p.type === 'electron') {
+          // Electrons are a force hazard, not an instant-collapse particle.
+        } else if (isTutorial && dist < hitR + 18) {
+          if (!p.nearLogged) { p.nearLogged = true; state.missCount++; }
+        } else if (dist < hitR) {
+          // Schrödinger phases through most matter, but dark matter and dark energy still collapse it.
+          if (!schroActive || p.type === 'dark' || p.type === 'energy' || p.type === 'falseQubit') { gameOver('hit by ' + particleDeathName(p.type)); return; }
         } else if (dist < hitR + 18) {
           if (!p.nearLogged) { p.nearLogged = true; state.missCount++; }
         }
@@ -799,7 +1301,7 @@
       // Auth side culls by screen + life. Non-auth side trusts snapshots to remove particles
       // (the "not seen" delete in handlePeerMessage), and only culls absurdly stale ones.
       if (isAuth) {
-        if (p.x < -60 || p.x > W + 60 || p.y < -60 || p.y > H + 60 || p.life > p.maxLife) {
+        if (p.remove || p.x < -60 || p.x > W + 60 || p.y < -60 || p.y > H + 60 || p.life > p.maxLife) {
           state.particles.splice(i, 1);
         }
       } else if (p.life > p.maxLife + 5) {
@@ -830,6 +1332,7 @@
     hudTime.textContent = (state.iAmDead ? state.deadAt : state.t).toFixed(1);
     hudMiss.textContent = state.missCount;
     hudState.textContent = stateLabel();
+    recordReplaySample(state, false);
     if (state.role === 'matter') updateMatterBar();
 
     // Network
@@ -950,6 +1453,39 @@
       ctx.restore();
     }
     ctx.save();
+    if (p.type === 'falseQubit') {
+      drawFalseQubitParticle(p);
+      ctx.restore();
+      return;
+    }
+    if (p.type === 'energy') {
+      const fieldR = p.repelR || particleStats('energy').repelR;
+      const pulse = 0.5 + Math.sin(p.life * 7) * 0.5;
+      const grad = ctx.createRadialGradient(p.x, p.y, p.r, p.x, p.y, fieldR);
+      grad.addColorStop(0, 'rgba(56,189,248,0.12)');
+      grad.addColorStop(0.48, 'rgba(56,189,248,0.035)');
+      grad.addColorStop(1, 'rgba(56,189,248,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(p.x, p.y, fieldR, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hexA(p.color, 0.08 + pulse * 0.08);
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, fieldR * (0.72 + pulse * 0.08), 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = hexA('#ffffff', 0.22);
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 8 + pulse * 4, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (p.type === 'electron') {
+      const fieldR = p.attractR || particleStats('electron').attractR;
+      const pulse = 0.5 + Math.sin(p.life * 8.5) * 0.5;
+      const grad = ctx.createRadialGradient(p.x, p.y, p.r, p.x, p.y, fieldR);
+      grad.addColorStop(0, 'rgba(250,204,21,0.12)');
+      grad.addColorStop(0.55, 'rgba(250,204,21,0.045)');
+      grad.addColorStop(1, 'rgba(250,204,21,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(p.x, p.y, fieldR, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hexA(p.color, 0.12 + pulse * 0.12);
+      ctx.lineWidth = 1.1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, fieldR * (0.66 + pulse * 0.07), 0, Math.PI * 2); ctx.stroke();
+    }
     ctx.shadowColor = p.color; ctx.shadowBlur = 18;
     ctx.fillStyle = p.color;
     ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
@@ -964,6 +1500,54 @@
       ctx.strokeStyle = hexA(p.color, 0.35); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 5 + Math.sin(p.life * 8) * 2, 0, Math.PI * 2); ctx.stroke();
     }
+    if (p.type === 'energy') {
+      ctx.fillStyle = '#e0f7ff';
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.42, 0, Math.PI * 2); ctx.fill();
+    }
+    if (p.type === 'electron') {
+      ctx.strokeStyle = '#0b0f02';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(p.x - p.r * 0.65, p.y);
+      ctx.lineTo(p.x + p.r * 0.65, p.y);
+      ctx.stroke();
+    }
+    if (p.type === 'neutrino') {
+      ctx.strokeStyle = hexA(p.color, 0.48);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(p.x - p.r * 1.4, p.y - p.r * 1.4);
+      ctx.lineTo(p.x + p.r * 1.4, p.y + p.r * 1.4);
+      ctx.moveTo(p.x + p.r * 1.4, p.y - p.r * 1.4);
+      ctx.lineTo(p.x - p.r * 1.4, p.y + p.r * 1.4);
+      ctx.stroke();
+      if (p.bouncesLeft > 0) {
+        ctx.strokeStyle = hexA(p.color, 0.16);
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 3 + (4 - p.bouncesLeft) * 1.2, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+  function drawFalseQubitParticle(p) {
+    const pulse = 0.5 + Math.sin(p.life * 9) * 0.5;
+    const glitch = Math.sin(p.life * 17) * 1.6;
+    ctx.save();
+    ctx.strokeStyle = hexA(p.color, 0.24 + pulse * 0.22);
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([3, 5]);
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 9 + pulse * 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = hexA('#ffffff', 0.16);
+    ctx.beginPath(); ctx.arc(p.x + glitch, p.y, p.r + 4, 0, Math.PI * 2); ctx.stroke();
+    drawQubitCore(p.x + glitch, p.y, p.r, 0.88, p.color);
+    ctx.globalCompositeOperation = 'screen';
+    drawQubitCore(p.x - 2.4, p.y + 0.8, p.r * 0.78, 0.24, '#22d3ee');
+    drawQubitCore(p.x + 2.4, p.y - 0.8, p.r * 0.78, 0.2, '#ff3860');
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.font = '9px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = hexA(p.color, 0.55);
+    ctx.fillText('FALSE', p.x, p.y - p.r - 13);
     ctx.restore();
   }
   function drawEffect(e) {
@@ -1108,20 +1692,33 @@
   // ============================================================
   // LOOP
   // ============================================================
+  const FIXED_STEP = 1 / 60;
+  const MAX_FRAME_STEPS = 5;
   let last = 0;
+  let stepAccumulator = 0;
   function loop(ts) {
     if (!last) last = ts;
-    let dt = Math.min(0.05, (ts - last) / 1000);
+    const frameDt = Math.min(0.12, (ts - last) / 1000);
     last = ts;
     if (state && state.running) {
-      // Time dilation during the decay animation — eases from 0.25× back to 1×.
-      if (state.dying) {
-        const elapsed = state.t - state.dyingStart;
-        const slow = elapsed < 0.4 ? 0.25 : (elapsed < 1.2 ? 0.45 : 0.85);
-        dt *= slow;
+      stepAccumulator += frameDt;
+      let steps = 0;
+      while (stepAccumulator >= FIXED_STEP && steps < MAX_FRAME_STEPS && state && state.running) {
+        let dt = FIXED_STEP;
+        // Time dilation during the decay animation — eases from 0.25× back to 1×.
+        if (state.dying) {
+          const elapsed = state.t - state.dyingStart;
+          const slow = elapsed < 0.4 ? 0.25 : (elapsed < 1.2 ? 0.45 : 0.85);
+          dt *= slow;
+        }
+        update(dt);
+        stepAccumulator -= FIXED_STEP;
+        steps++;
       }
-      update(dt);
-      draw();
+      if (steps >= MAX_FRAME_STEPS) stepAccumulator = 0;
+      if (state && state.running) draw();
+    } else {
+      stepAccumulator = 0;
     }
     requestAnimationFrame(loop);
   }
@@ -1137,14 +1734,23 @@
       const r = await fetch(apiBase() + '/api/run/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: modeKey })
+        body: JSON.stringify({ mode: modeKey, width: Math.round(W), height: Math.round(H) })
       });
       const j = await r.json();
       if (!j.ok || !j.token) throw new Error(j.reason || 'run token unavailable');
-      if (state === targetState) targetState.runToken = j.token;
+      if (state === targetState) {
+        targetState.runToken = j.token;
+        if (j.seed !== undefined) initRunProof(targetState, j.seed, j.width || W, j.height || H);
+      }
       return j.token;
     } catch (e) {
-      if (state === targetState) targetState.runTokenError = e && e.message ? e.message : 'run token unavailable';
+      if (state === targetState) {
+        targetState.runTokenError = e && e.message ? e.message : 'run token unavailable';
+        if (!targetState.runSeed) {
+          const fallbackSeed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
+          initRunProof(targetState, fallbackSeed, W, H);
+        }
+      }
       return null;
     }
   }
@@ -1163,7 +1769,8 @@
 
   function startSoloGame(modeKey) {
     state = newState(modeKey, null);
-    armRunToken(modeKey);
+    stepAccumulator = 0;
+    if (modeKey !== 'tutorial') armRunToken(modeKey);
     hideAllOverlays();
     hudMode.textContent = MODES[modeKey].name;
     hudCenter.style.display = 'none';
@@ -1171,6 +1778,17 @@
     hud.classList.remove('hidden');
     powerupsEl.classList.remove('hidden');
     matterBar.classList.add('hidden');
+    if (modeKey === 'tutorial') {
+      state.spawnT = 999;
+      for (const p of POWERS) {
+        const ps = state.powers[p.id];
+        ps.unlocked = false;
+        ps.charges = 0;
+        ps.activeUntil = 0;
+      }
+      updatePowerUI();
+      advanceTutorial();
+    }
   }
   function startMpGame(matchInfo) {
     const isCompetition = matchInfo.mode === 'competition';
@@ -1180,7 +1798,7 @@
       peerNick: matchInfo.peerNick, peerId: matchInfo.peerId,
       isHost: matchInfo.isHost, gameMode: matchInfo.mode, role
     });
-    if (isCompetition) armRunToken(modeKey);
+    stepAccumulator = 0;
     hideAllOverlays();
     hudMode.textContent = isCompetition ? ('COMPETE // ' + MODES[modeKey].name) : 'QUBIT vs MATTER';
     hudCenter.style.display = 'block';
@@ -1200,6 +1818,7 @@
     menu.classList.add('hidden'); endScreen.classList.add('hidden');
     nickScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
     inviteScreen.classList.add('hidden');
+    tutorialPop.classList.add('hidden');
     const sub = document.getElementById('submitScreen');
     const lb = document.getElementById('lbScreen');
     if (sub) sub.classList.add('hidden');
@@ -1211,6 +1830,7 @@
     state.iAmDead = true;
     state.deadAt = state.t;
     state.cause = reason || 'decohered';
+    recordReplaySample(state, true);
     // Matter shooter has no qubit to decay — just close out.
     if (state.role === 'matter') {
       state.running = false;
@@ -1384,8 +2004,9 @@
         stats = `YOU ${mySurv.toFixed(2)}s\n${peerNick.toUpperCase()} ${oppSurv ? oppSurv.toFixed(2)+'s' : 'STILL ALIVE'}\nMODE ${state.cfg.name} // MISSES ${state.missCount}`;
       }
     } else {
+      const survived = state.deadAt || state.t;
       title = 'DECAYED → |BIT>';
-      stats = `SURVIVED ${state.t.toFixed(2)}s\nMODE ${state.cfg.name} // NEAR MISSES ${state.missCount}\n${state.cause.toUpperCase()}`;
+      stats = `SURVIVED ${survived.toFixed(2)}s\nMODE ${state.cfg.name} // NEAR MISSES ${state.missCount}\n${state.cause.toUpperCase()}`;
     }
     endTitle.textContent = title;
     endStats.textContent = stats;
@@ -1395,16 +2016,12 @@
     matterBar.classList.add('hidden');
 
     // Determine leaderboard eligibility:
-    //  - Solo: every run qualifies
-    //  - Competition: only if I outsurvived peer (or peer disconnected and I'm still standing)
-    //  - QvM: never
+    //  - Solo: every run qualifies after server replay validation
+    //  - Multiplayer: unranked, because peer-snapshot matches are not server-authoritative
     let lbMode = null, lbTime = 0, lbNear = state.missCount;
-    if (!state.mp) {
+    if (!state.mp && state.mode !== 'tutorial') {
       lbMode = state.mode;
-      lbTime = state.t;
-    } else if (state.gameMode === 'competition') {
-      const mySurv = state.deadAt || state.t;
-      if (mySurv > (state.peerSurvived || 0)) { lbMode = state.mode; lbTime = mySurv; }
+      lbTime = state.deadAt || state.t;
     }
 
     if (lbMode && lbTime > 0 && lbTime <= 3600) {
@@ -1423,7 +2040,7 @@
   const submitScreen = document.getElementById('submitScreen');
   const lbScreen = document.getElementById('lbScreen');
   const lbList = document.getElementById('lbList');
-  let lbCurrentTab = 'easy';
+  let lbCurrentTab = 'normal';
   let lbCache = null;
   let lbLastSubmitted = null; // { mode, nick, time }
 
@@ -1431,10 +2048,13 @@
     if (location.protocol === 'file:') return 'http://localhost:8080';
     return '';
   }
+  function modeName(mode) {
+    return (MODES[mode] && MODES[mode].name) || String(mode || '').toUpperCase();
+  }
 
   function showSubmitPrompt(mode, time, near) {
     document.getElementById('submitTime').textContent = time.toFixed(2) + 's';
-    document.getElementById('submitMode').textContent = mode.toUpperCase();
+    document.getElementById('submitMode').textContent = modeName(mode);
     const inp = document.getElementById('submitNick');
     try { inp.value = myNick || localStorage.getItem('qubit_nick') || ''; } catch {}
     document.getElementById('submitStatus').textContent = 'Empty nickname will skip.';
@@ -1456,6 +2076,10 @@
       const nick = checked.nick;
       inp.value = nick;
       try { localStorage.setItem('qubit_nick', nick); } catch {}
+      if (state && state.runtimeTampered) {
+        document.getElementById('submitStatus').textContent = 'FAILED: RUNTIME MODIFIED';
+        return;
+      }
       document.getElementById('submitStatus').textContent = 'TRANSMITTING...';
       const runToken = await getRunTokenForSubmit();
       if (!runToken) {
@@ -1466,7 +2090,7 @@
         const r = await fetch(apiBase() + '/api/score', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode, nick, time, near, runToken })
+          body: JSON.stringify({ mode, nick, time, near, runToken, proof: buildRunProof(mode, time) })
         });
         const j = await r.json();
         if (j.ok) {
@@ -1475,7 +2099,7 @@
           lbCache = null; // bust cache
           const rankEl = document.getElementById('endRank');
           rankEl.classList.remove('hidden');
-          rankEl.textContent = j.inTop ? `★ RANK #${j.rank} ON ${mode.toUpperCase()} ★` : `LOGGED — NOT IN TOP ${j.top.length}`;
+          rankEl.textContent = j.inTop ? `★ RANK #${j.rank} ON ${modeName(mode)} ★` : `LOGGED — NOT IN TOP ${j.top.length}`;
           finish(true);
         } else {
           document.getElementById('submitStatus').textContent = 'FAILED: ' + (j.reason || 'unknown');
@@ -1546,6 +2170,8 @@
   document.getElementById('btnLBRefresh').addEventListener('click', () => {
     lbCache = null; renderLeaderboardTab();
   });
+  btnTutorialNext.addEventListener('click', advanceTutorial);
+  btnTutorialExit.addEventListener('click', exitTutorial);
   document.querySelectorAll('.lb-tab').forEach(b => {
     b.addEventListener('click', () => {
       lbCurrentTab = b.dataset.tab;
@@ -1590,7 +2216,7 @@
   let ws = null;
   let myId = null, myCode = null, myNick = null;
   let inviteSelectedMode = 'competition';
-  let inviteSelectedDifficulty = 'easy';
+  let inviteSelectedDifficulty = 'normal';
   let inviteSelectedRole = 'qubit';
   let currentInvite = null;
   let onlinePlayers = [];
@@ -1909,7 +2535,7 @@
   function showInvite(inv) {
     const modeLabel = inv.mode === 'qvm'
       ? 'QUBIT vs MATTER — they want to be ' + inv.role.toUpperCase() + ' (you = ' + (inv.role === 'qubit' ? 'MATTER' : 'QUBIT') + ')'
-      : 'COMPETITION — ' + (inv.difficulty || 'normal').toUpperCase();
+      : 'COMPETITION — ' + modeName(inv.difficulty || 'normal');
     document.getElementById('inviteFromNick').textContent = 'FROM: ' + inv.fromNick;
     document.getElementById('inviteMode').textContent = modeLabel;
     inviteScreen.classList.remove('hidden');
@@ -1930,10 +2556,13 @@
   // ============================================================
   // MULTIPLAYER NETWORK (relay through server)
   // ============================================================
-  function mpSend(data) {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    try { ws.send(JSON.stringify({ t: 'relay', data })); } catch {}
-  }
+	  function mpSend(data) {
+	    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+	    try { ws.send(JSON.stringify({ t: 'relay', data })); } catch {}
+	  }
+	  function particleTypeCode(type) {
+	    return ({ normal: 'n', light: 'l', dark: 'd', anti: 'a', energy: 'g', electron: 'e', falseQubit: 'f', neutrino: 'u' })[type] || 'n';
+	  }
 
   function mpTick() {
     if (!state.mp) return;
@@ -1946,7 +2575,7 @@
     // Snapshot at ~20Hz from authoritative side. Cap raised so a busy field fully syncs.
     const sendsSnap = (state.gameMode === 'competition' && state.mp.isHost) || (state.gameMode === 'qvm' && state.role === 'qubit');
     if (sendsSnap && now - state.lastSnapshotSent > 0.05) {
-      const snap = state.particles.slice(0, 150).map(p => [p.id, p.type[0], Math.round(p.x), Math.round(p.y), Math.round(p.vx), Math.round(p.vy), Math.round(p.life * 10)]);
+	      const snap = state.particles.slice(0, 150).map(p => [p.id, particleTypeCode(p.type), Math.round(p.x), Math.round(p.y), Math.round(p.vx), Math.round(p.vy), Math.round(p.life * 10)]);
       mpSend({ t: 'snap', ps: snap });
       state.lastSnapshotSent = now;
     }
@@ -1971,19 +2600,21 @@
       const incoming = msg.ps;
       const byId = new Map(); for (const p of state.particles) byId.set(p.id, p);
       const seen = new Set();
-      const typeMap = { n: 'normal', l: 'light', d: 'dark', a: 'anti' };
+	      const typeMap = { n: 'normal', l: 'light', d: 'dark', a: 'anti', g: 'energy', e: 'electron', f: 'falseQubit', u: 'neutrino' };
       for (const s of incoming) {
         const [id, tch, x, y, vx, vy, l10] = s;
         seen.add(id);
         const type = typeMap[tch] || 'normal';
+        const stats = particleStats(type);
         let p = byId.get(id);
         if (!p) {
-          state.particles.push({
+          appendParticle(state.particles, {
             id, type, x, y, tx: x, ty: y, vx, vy,
-            r: type === 'light' ? 3 : (type === 'dark' ? 7 : 5),
-            color: COLORS[type],
-            life: l10/10, maxLife: 14, trail: [],
-            trackUntil: type === 'dark' ? 5 : 0, baseSpeed: Math.hypot(vx, vy)
+            r: stats.r,
+            color: COLORS[type] || COLORS.normal,
+            life: l10/10, maxLife: stats.maxLife, trail: [],
+	            trackUntil: stats.track, repelR: stats.repelR || 0, attractR: stats.attractR || 0,
+	            bouncesLeft: stats.bounces || 0, enteredField: true, baseSpeed: Math.hypot(vx, vy)
           });
         } else {
           // Update target only; render position smoothly chases it in update().

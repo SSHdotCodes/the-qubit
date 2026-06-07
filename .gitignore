@@ -3,7 +3,7 @@ node_modules/
 .env.*
 !.env.example
 leaderboard.json
+data/
 *.log
 .DS_Store
 ._*
-
