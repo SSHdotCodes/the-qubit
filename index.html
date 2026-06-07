@@ -31,6 +31,9 @@
     text-align: center; padding: 20px; z-index: 10; overflow-y: auto;
   }
   .hidden { display: none !important; }
+  /* Tamper guard sits above every other overlay/HUD layer. */
+  #tamperGuard { z-index: 9999; background: rgba(0,0,0,0.98); }
+  body.tampered #game, body.tampered #hud { filter: blur(8px); pointer-events: none; }
   h1.title {
     font-size: clamp(34px, 8vw, 86px);
     letter-spacing: 0.15em;
@@ -383,6 +386,78 @@
       </div>
     </div>
   </div>
+
+<div id="tamperGuard" class="overlay hidden" aria-hidden="true">
+  <h1 class="title">QUANTUM SEAL</h1>
+  <p class="subtitle">DEVELOPER TOOLS DETECTED</p>
+  <p style="max-width:520px;color:var(--dim-green);line-height:1.6;margin-top:8px;">
+    THE QUBIT does not run while developer tools are open. Close the inspector /
+    console to resume. Tampering with the client will not produce a valid
+    leaderboard run — scores are validated on the server.
+  </p>
+</div>
+
+<script>
+// ============================================================
+// CLIENT TAMPER GUARD
+// ------------------------------------------------------------
+// Deterrent only. This raises the bar against casual "inspect
+// element" / console cheating, it does NOT make the client
+// trustworthy. The real anti-cheat lives server-side (one-time,
+// time-checked run tokens in /api/run/start + /api/score).
+// ============================================================
+(() => {
+  const guard = document.getElementById('tamperGuard');
+  let devtoolsOpen = false;
+
+  // 1. Suppress the right-click context menu (the usual path to
+  //    "Inspect Element").
+  document.addEventListener('contextmenu', e => e.preventDefault());
+
+  // 2. Swallow the common devtools / view-source / save keyboard
+  //    shortcuts. Works on both Windows/Linux (Ctrl) and macOS (Cmd).
+  document.addEventListener('keydown', e => {
+    const ctrl = e.ctrlKey || e.metaKey;
+    const key = (e.key || '').toLowerCase();
+    const block =
+      e.key === 'F12' ||                                  // devtools
+      (ctrl && e.shiftKey && ['i', 'j', 'c'].includes(key)) || // inspect / console / picker
+      (ctrl && key === 'u') ||                            // view source
+      (ctrl && key === 's');                              // save page
+    if (block) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+  }, true);
+
+  // 3. Heuristic devtools detector. When the inspector is docked it
+  //    steals viewport space; a large gap between outer and inner
+  //    size is a strong signal it is open. Purely a deterrent — when
+  //    triggered we cover the screen and pause input instead of
+  //    bricking the page, so false positives are recoverable.
+  const THRESHOLD = 170;
+  function setOpen(open) {
+    if (open === devtoolsOpen) return;
+    devtoolsOpen = open;
+    guard.classList.toggle('hidden', !open);
+    guard.setAttribute('aria-hidden', open ? 'false' : 'true');
+    document.body.classList.toggle('tampered', open);
+    window.dispatchEvent(new CustomEvent(open ? 'tamper:open' : 'tamper:close'));
+  }
+  function check() {
+    const widthGap = window.outerWidth - window.innerWidth;
+    const heightGap = window.outerHeight - window.innerHeight;
+    // Ignore narrow viewports (mobile) where the heuristic is noisy.
+    const likely = window.innerWidth > 500 &&
+      (widthGap > THRESHOLD || heightGap > THRESHOLD);
+    setOpen(likely);
+  }
+  window.addEventListener('resize', check);
+  setInterval(check, 1000);
+  check();
+})();
+</script>
 
 <script>
 (() => {
